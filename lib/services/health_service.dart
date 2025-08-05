@@ -23,23 +23,41 @@ class HealthService {
 
   // Obtiene la lista de registros de salud para un gallo específico en tiempo real
   Stream<List<HealthLogModel>> getHealthLogsStream(String roosterId) {
-    return _healthLogsCollection(roosterId)
-        .orderBy(
-          'date',
-          descending: true,
-        ) // Ordenamos por fecha, el más reciente primero
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => HealthLogModel.fromFirestore(doc))
-              .toList();
-        });
+    return _healthLogsCollection(
+      roosterId,
+    ).orderBy('date', descending: true).snapshots().map((snapshot) {
+      return snapshot.docs
+          .map((doc) => HealthLogModel.fromFirestore(doc))
+          .toList();
+    });
   }
 
-  // --- FUTUROS MÉTODOS ---
-  // Dejamos el esqueleto preparado para el formulario de añadir registro.
+  // --- ¡MÉTODO AÑADIDO Y FUNCIONAL! ---
+  // Añade un nuevo registro de salud a la base de datos
+  Future<void> addHealthLog({
+    required String roosterId,
+    required DateTime date,
+    required String logType,
+    required String description,
+    required String notes,
+  }) async {
+    if (currentUserId == null) {
+      throw Exception("Usuario no autenticado.");
+    }
+    try {
+      // Preparamos los datos en un mapa para Firestore
+      Map<String, dynamic> logData = {
+        'date': Timestamp.fromDate(date),
+        'logType': logType,
+        'description': description,
+        'notes': notes,
+      };
 
-  // Future<void> addHealthLog(String roosterId, Map<String, dynamic> logData) async {
-  //   await _healthLogsCollection(roosterId).add(logData);
-  // }
+      // Añadimos el nuevo documento a la sub-sub-colección
+      await _healthLogsCollection(roosterId).add(logData);
+    } catch (e) {
+      print("Error al guardar el registro de salud: $e");
+      throw Exception("Ocurrió un error al guardar el registro de salud.");
+    }
+  }
 }

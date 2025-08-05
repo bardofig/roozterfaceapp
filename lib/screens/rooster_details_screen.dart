@@ -6,58 +6,335 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:roozterfaceapp/models/fight_model.dart';
+import 'package:roozterfaceapp/models/health_log_model.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
 import 'package:roozterfaceapp/models/user_model.dart';
 import 'package:roozterfaceapp/screens/add_fight_screen.dart';
+import 'package:roozterfaceapp/screens/add_health_log_screen.dart'; // Crearemos este archivo después
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
 import 'package:roozterfaceapp/services/fight_service.dart';
+import 'package:roozterfaceapp/services/health_service.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';
 import 'package:roozterfaceapp/widgets/fight_tile.dart';
+import 'package:roozterfaceapp/widgets/health_log_tile.dart';
 
-class RoosterDetailsScreen extends StatelessWidget {
+class RoosterDetailsScreen extends StatefulWidget {
   final RoosterModel rooster;
 
   const RoosterDetailsScreen({super.key, required this.rooster});
 
-  // Navega a la pantalla para editar los datos principales del gallo
-  void _goToEditScreen(BuildContext context, String currentUserPlan) {
+  @override
+  State<RoosterDetailsScreen> createState() => _RoosterDetailsScreenState();
+}
+
+class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  final RoosterService _roosterService = RoosterService();
+
+  @override
+  void initState() {
+    super.initState();
+    // Creamos un TabController con 3 pestañas
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _goToEditScreen(String currentUserPlan) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AddRoosterScreen(
-          roosterToEdit: rooster,
+          roosterToEdit: widget.rooster,
           currentUserPlan: currentUserPlan,
         ),
       ),
     );
   }
 
-  // Navega al formulario para AÑADIR un nuevo evento de combate
-  void _goToAddFightScreen(BuildContext context) {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: StreamBuilder<DocumentSnapshot>(
+        stream: _roosterService.getUserProfileStream(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final userProfile = UserModel.fromFirestore(snapshot.data!);
+          final bool isMaestroOrHigher = userProfile.plan != 'iniciacion';
+
+          // Usamos NestedScrollView para que la AppBar se oculte al hacer scroll
+          return NestedScrollView(
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverAppBar(
+                  expandedHeight: 250.0,
+                  floating: false,
+                  pinned: true,
+                  backgroundColor: Colors.grey[900],
+                  foregroundColor: Colors.white,
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.edit),
+                      onPressed: () => _goToEditScreen(userProfile.plan),
+                    ),
+                  ],
+                  flexibleSpace: FlexibleSpaceBar(
+                    title: Text(
+                      widget.rooster.name,
+                      style: const TextStyle(fontSize: 16.0),
+                    ),
+                    background: widget.rooster.imageUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: widget.rooster.imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) =>
+                                Container(color: Colors.grey[300]),
+                            errorWidget: (context, url, error) =>
+                                const Icon(Icons.broken_image),
+                          )
+                        : Container(
+                            color: Colors.grey[300],
+                            child: const Center(
+                              child: Icon(
+                                Icons.shield_outlined,
+                                size: 100,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                  ),
+                  // Las Pestañas van aquí, en la parte inferior de la AppBar
+                  bottom: TabBar(
+                    controller: _tabController,
+                    indicatorColor: Colors.white,
+                    labelColor: Colors.white,
+                    unselectedLabelColor: Colors.grey[400],
+                    tabs: [
+                      const Tab(icon: Icon(Icons.info), text: 'General'),
+                      // Mostramos las pestañas premium solo si el plan lo permite
+                      if (isMaestroOrHigher)
+                        const Tab(
+                          icon: Icon(Icons.sports_kabaddi),
+                          text: 'Combates',
+                        ),
+                      if (isMaestroOrHigher)
+                        const Tab(
+                          icon: Icon(Icons.health_and_safety),
+                          text: 'Salud',
+                        ),
+                    ],
+                  ),
+                ),
+              ];
+            },
+            body: TabBarView(
+              controller: _tabController,
+              children: [
+                // Vista de la Pestaña 1: General
+                _buildGeneralInfoTab(),
+                // Vistas de las Pestañas Premium
+                if (isMaestroOrHigher) _buildFightsTab(),
+                if (isMaestroOrHigher) _buildHealthTab(),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // --- WIDGETS PARA CADA PESTAÑA ---
+
+  Widget _buildGeneralInfoTab() {
+    final DateFormat formatter = DateFormat('dd de MMMM de yyyy', 'es_ES');
+    final String formattedBirthDate = formatter.format(
+      widget.rooster.birthDate.toDate(),
+    );
+    final String fatherDisplay =
+        widget.rooster.fatherName ??
+        widget.rooster.fatherLineageText ??
+        'No registrado';
+    final String motherDisplay =
+        widget.rooster.motherName ??
+        widget.rooster.motherLineageText ??
+        'No registrada';
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.rooster.name,
+            style: GoogleFonts.germaniaOne(fontSize: 32),
+          ),
+          const SizedBox(height: 16),
+          _buildDetailRow(
+            icon: Icons.badge,
+            label: 'Placa',
+            value: widget.rooster.plate.isNotEmpty
+                ? widget.rooster.plate
+                : 'N/A',
+          ),
+          const Divider(),
+          _buildDetailRow(
+            icon: Icons.cake,
+            label: 'Nacimiento',
+            value: formattedBirthDate,
+          ),
+          const Divider(),
+          _buildDetailRow(
+            icon: Icons.monitor_heart,
+            label: 'Estado',
+            value: widget.rooster.status,
+          ),
+          const Divider(),
+          const SizedBox(height: 16),
+          Text("Linaje", style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          _buildDetailRow(
+            icon: Icons.male,
+            label: 'Línea Paterna',
+            value: fatherDisplay,
+          ),
+          const Divider(),
+          _buildDetailRow(
+            icon: Icons.female,
+            label: 'Línea Materna',
+            value: motherDisplay,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFightsTab() {
+    final FightService fightService = FightService();
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              icon: const Icon(Icons.add_circle, color: Colors.black),
+              label: const Text(
+                "Programar Combate",
+                style: TextStyle(color: Colors.black),
+              ),
+              onPressed: () => _goToAddFightScreen(),
+            ),
+          ),
+          StreamBuilder<List<FightModel>>(
+            stream: fightService.getFightsStream(widget.rooster.id),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting)
+                return const CircularProgressIndicator();
+              if (!snapshot.hasData || snapshot.data!.isEmpty)
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24.0),
+                  child: Text("No hay eventos registrados."),
+                );
+              final fights = snapshot.data!;
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: fights.length,
+                itemBuilder: (context, index) {
+                  final fight = fights[index];
+                  return FightTile(
+                    fight: fight,
+                    onTap: () => _goToEditFightScreen(fight),
+                  );
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHealthTab() {
+    final HealthService healthService = HealthService();
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              icon: const Icon(Icons.add_circle, color: Colors.black),
+              label: const Text(
+                "Añadir Registro",
+                style: TextStyle(color: Colors.black),
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        AddHealthLogScreen(roosterId: widget.rooster.id),
+                  ),
+                );
+              },
+            ),
+          ),
+          StreamBuilder<List<HealthLogModel>>(
+            stream: healthService.getHealthLogsStream(widget.rooster.id),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting)
+                return const CircularProgressIndicator();
+              if (!snapshot.hasData || snapshot.data!.isEmpty)
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24.0),
+                  child: Text("No hay registros de salud."),
+                );
+              final logs = snapshot.data!;
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: logs.length,
+                itemBuilder: (context, index) =>
+                    HealthLogTile(log: logs[index]),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Métodos de navegación y ayuda (los necesitamos aquí también)
+  void _goToAddFightScreen() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddFightScreen(roosterId: rooster.id),
+        builder: (context) => AddFightScreen(roosterId: widget.rooster.id),
         fullscreenDialog: true,
       ),
     );
   }
 
-  // Navega al formulario para EDITAR un evento de combate existente
-  void _goToEditFightScreen(BuildContext context, FightModel fight) {
+  void _goToEditFightScreen(FightModel fight) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) =>
-            AddFightScreen(roosterId: rooster.id, fightToEdit: fight),
+            AddFightScreen(roosterId: widget.rooster.id, fightToEdit: fight),
         fullscreenDialog: true,
       ),
     );
   }
 
-  // Widget de ayuda para construir las filas de detalles (Nombre: Valor)
-  Widget _buildDetailRow(
-    BuildContext context, {
+  Widget _buildDetailRow({
     required IconData icon,
     required String label,
     required String value,
@@ -71,221 +348,9 @@ class RoosterDetailsScreen extends StatelessWidget {
           const SizedBox(width: 16),
           Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
           Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              softWrap:
-                  true, // Permite que el texto largo salte a la siguiente línea
-            ),
+            child: Text(value, textAlign: TextAlign.right, softWrap: true),
           ),
         ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final DateFormat formatter = DateFormat('dd de MMMM de yyyy', 'es_ES');
-    final String formattedBirthDate = formatter.format(
-      rooster.birthDate.toDate(),
-    );
-    final RoosterService roosterService = RoosterService();
-    final FightService fightService = FightService();
-
-    // Lógica para determinar qué mostrar como linaje
-    final String fatherDisplay =
-        rooster.fatherName ?? rooster.fatherLineageText ?? 'No registrado';
-    final String motherDisplay =
-        rooster.motherName ?? rooster.motherLineageText ?? 'No registrada';
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(rooster.name),
-        backgroundColor: Colors.grey[900],
-        foregroundColor: Colors.white,
-        actions: [
-          StreamBuilder<DocumentSnapshot>(
-            stream: roosterService.getUserProfileStream(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const IconButton(
-                  icon: Icon(Icons.edit),
-                  onPressed: null,
-                );
-              }
-              final userProfile = UserModel.fromFirestore(snapshot.data!);
-              return IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: () => _goToEditScreen(context, userProfile.plan),
-              );
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Sección de Imagen
-            rooster.imageUrl.isNotEmpty
-                ? CachedNetworkImage(
-                    imageUrl: rooster.imageUrl,
-                    fit: BoxFit.cover,
-                    width: double.infinity,
-                    height: 250,
-                    placeholder: (context, url) => Container(
-                      height: 250,
-                      color: Colors.grey[300],
-                      child: const Center(child: CircularProgressIndicator()),
-                    ),
-                    errorWidget: (context, url, error) => Container(
-                      height: 250,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.broken_image, size: 50),
-                    ),
-                  )
-                : Container(
-                    height: 250,
-                    color: Colors.grey[300],
-                    child: const Center(
-                      child: Icon(
-                        Icons.shield_outlined,
-                        size: 100,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-
-            // Sección de Información General
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    rooster.name,
-                    style: GoogleFonts.germaniaOne(fontSize: 32),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildDetailRow(
-                    context,
-                    icon: Icons.badge,
-                    label: 'Placa',
-                    value: rooster.plate.isNotEmpty ? rooster.plate : 'N/A',
-                  ),
-                  const Divider(),
-                  _buildDetailRow(
-                    context,
-                    icon: Icons.cake,
-                    label: 'Nacimiento',
-                    value: formattedBirthDate,
-                  ),
-                  const Divider(),
-                  _buildDetailRow(
-                    context,
-                    icon: Icons.monitor_heart,
-                    label: 'Estado',
-                    value: rooster.status,
-                  ),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  Text("Linaje", style: Theme.of(context).textTheme.titleLarge),
-                  const SizedBox(height: 8),
-                  _buildDetailRow(
-                    context,
-                    icon: Icons.male,
-                    label: 'Línea Paterna',
-                    value: fatherDisplay,
-                  ),
-                  const Divider(),
-                  _buildDetailRow(
-                    context,
-                    icon: Icons.female,
-                    label: 'Línea Materna',
-                    value: motherDisplay,
-                  ),
-                ],
-              ),
-            ),
-
-            // Sección de Historial de Combate
-            StreamBuilder<DocumentSnapshot>(
-              stream: roosterService.getUserProfileStream(),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) return const SizedBox.shrink();
-
-                final userProfile = UserModel.fromFirestore(snapshot.data!);
-                if (userProfile.plan == 'iniciacion')
-                  return const SizedBox.shrink();
-
-                return Padding(
-                  padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            "Eventos de Combate",
-                            style: Theme.of(context).textTheme.titleLarge,
-                          ),
-                          IconButton(
-                            icon: const Icon(
-                              Icons.add_circle,
-                              color: Colors.black,
-                            ),
-                            onPressed: () => _goToAddFightScreen(context),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      StreamBuilder<List<FightModel>>(
-                        stream: fightService.getFightsStream(rooster.id),
-                        builder: (context, fightSnapshot) {
-                          if (fightSnapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-                          if (!fightSnapshot.hasData ||
-                              fightSnapshot.data!.isEmpty) {
-                            return const Center(
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(vertical: 24.0),
-                                child: Text(
-                                  "Este gallo aún no tiene eventos registrados.",
-                                ),
-                              ),
-                            );
-                          }
-
-                          final fights = fightSnapshot.data!;
-                          return ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: fights.length,
-                            separatorBuilder: (context, index) =>
-                                const SizedBox(height: 8),
-                            itemBuilder: (context, index) {
-                              final fight = fights[index];
-                              return FightTile(
-                                fight: fight,
-                                onTap: () =>
-                                    _goToEditFightScreen(context, fight),
-                              );
-                            },
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
       ),
     );
   }

@@ -23,11 +23,13 @@ class AddRoosterScreen extends StatefulWidget {
 }
 
 class _AddRoosterScreenState extends State<AddRoosterScreen> {
+  // Controladores
   final _nameController = TextEditingController();
   final _plateController = TextEditingController();
   final _fatherLineageController = TextEditingController();
   final _motherLineageController = TextEditingController();
 
+  // Variables de Estado
   DateTime? _selectedDate;
   String? _selectedStatus;
   final List<String> _statuses = [
@@ -42,6 +44,9 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
   String? _selectedFatherId;
   String? _selectedMotherId;
 
+  // Flag para controlar la inicialización de los IDs de linaje
+  bool _lineageIdsInitialized = false;
+
   @override
   void initState() {
     super.initState();
@@ -51,8 +56,6 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
       _plateController.text = rooster.plate;
       _selectedDate = rooster.birthDate.toDate();
       _selectedStatus = rooster.status;
-      _selectedFatherId = rooster.fatherId;
-      _selectedMotherId = rooster.motherId;
       _fatherLineageController.text = rooster.fatherLineageText ?? '';
       _motherLineageController.text = rooster.motherLineageText ?? '';
     } else {
@@ -236,15 +239,34 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
             return Center(child: Text("Error: ${snapshot.error}"));
           }
           final allRoosters = snapshot.data ?? [];
-          final dropdownItems = allRoosters
+
+          final possibleParents = allRoosters
               .where((r) => isEditing ? r.id != widget.roosterToEdit!.id : true)
-              .map((rooster) {
-                return DropdownMenuItem<String>(
-                  value: rooster.id,
-                  child: Text("${rooster.name} (${rooster.plate})"),
-                );
-              })
               .toList();
+          final dropdownItems = possibleParents.map((rooster) {
+            return DropdownMenuItem<String>(
+              value: rooster.id,
+              child: Text("${rooster.name} (${rooster.plate})"),
+            );
+          }).toList();
+
+          // --- LÓGICA DE CORRECCIÓN ---
+          // Esta lógica ahora se ejecuta cada vez que el StreamBuilder se reconstruye,
+          // asegurando que los datos estén sincronizados.
+          if (isEditing && !_lineageIdsInitialized) {
+            final rooster = widget.roosterToEdit!;
+            if (rooster.fatherId != null &&
+                possibleParents.any((p) => p.id == rooster.fatherId)) {
+              _selectedFatherId = rooster.fatherId;
+            }
+            if (rooster.motherId != null &&
+                possibleParents.any((p) => p.id == rooster.motherId)) {
+              _selectedMotherId = rooster.motherId;
+            }
+            // Marcamos como inicializado para que esto no se ejecute en cada reconstrucción (ej: al escribir)
+            _lineageIdsInitialized = true;
+          }
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
