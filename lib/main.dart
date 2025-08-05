@@ -1,18 +1,18 @@
-import 'package:flutter/material.dart';
-
-// 1. Importa los paquetes que acabamos de instalar
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // Este archivo lo generó flutterfire_cli
+import 'package:flutter/material.dart';
+import 'firebase_options.dart';
+
+// Este será nuestro punto de partida. Más adelante, aquí decidiremos
+// si el usuario ve la pantalla de login o la pantalla principal.
+import 'package:roozterfaceapp/features/auth/presentation/screens/auth_gate.dart';
 
 void main() async {
-  // 2. Convierte el main en una función asíncrona
-  // 3. Asegúrate de que los bindings de Flutter estén listos
+  // Asegura que todo esté inicializado antes de ejecutar la app
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 4. Inicializa Firebase usando las opciones para la plataforma actual
+  // Inicializa Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // 5. Ejecuta la aplicación
   runApp(const MyApp());
 }
 
@@ -22,12 +22,16 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      // Desactiva la cinta de "Debug" en la esquina de la app
+      debugShowCheckedModeBanner: false,
       title: 'RoozterFaceApp',
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: const Scaffold(
-        // Pantalla de ejemplo temporal
-        body: Center(child: Text('¡RoozterFaceApp Conectado a Firebase!')),
+      theme: ThemeData(
+        // Definiremos un tema visual consistente más adelante
+        primarySwatch: Colors.blue,
       ),
+      // El punto de entrada visual de nuestra aplicación.
+      // Crearemos este archivo en los siguientes pasos.
+      home: const AuthGate(),
     );
   }
 }
