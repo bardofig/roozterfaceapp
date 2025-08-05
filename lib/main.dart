@@ -1,18 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:roozterfaceapp/screens/auth_gate.dart'; // <-- RUTA ACTUALIZADA
 import 'firebase_options.dart';
 
-// Este será nuestro punto de partida. Más adelante, aquí decidiremos
-// si el usuario ve la pantalla de login o la pantalla principal.
-import 'package:roozterfaceapp/features/auth/presentation/screens/auth_gate.dart';
-
 void main() async {
-  // Asegura que todo esté inicializado antes de ejecutar la app
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Inicializa Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
   runApp(const MyApp());
 }
 
@@ -22,15 +15,13 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // Desactiva la cinta de "Debug" en la esquina de la app
       debugShowCheckedModeBanner: false,
       title: 'RoozterFaceApp',
       theme: ThemeData(
-        // Definiremos un tema visual consistente más adelante
-        primarySwatch: Colors.blue,
+        // Más adelante definiremos un tema visual consistente
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
       ),
-      // El punto de entrada visual de nuestra aplicación.
-      // Crearemos este archivo en los siguientes pasos.
       home: const AuthGate(),
     );
   }
