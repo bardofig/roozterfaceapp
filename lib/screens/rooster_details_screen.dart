@@ -5,16 +5,21 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:roozterfaceapp/models/fight_model.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
 import 'package:roozterfaceapp/models/user_model.dart';
+import 'package:roozterfaceapp/screens/add_fight_screen.dart';
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
+import 'package:roozterfaceapp/services/fight_service.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';
+import 'package:roozterfaceapp/widgets/fight_tile.dart';
 
 class RoosterDetailsScreen extends StatelessWidget {
   final RoosterModel rooster;
 
   const RoosterDetailsScreen({super.key, required this.rooster});
 
+  // Navega a la pantalla para editar los datos principales del gallo
   void _goToEditScreen(BuildContext context, String currentUserPlan) {
     Navigator.push(
       context,
@@ -27,6 +32,30 @@ class RoosterDetailsScreen extends StatelessWidget {
     );
   }
 
+  // Navega al formulario para AÑADIR un nuevo evento de combate
+  void _goToAddFightScreen(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddFightScreen(roosterId: rooster.id),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  // Navega al formulario para EDITAR un evento de combate existente
+  void _goToEditFightScreen(BuildContext context, FightModel fight) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            AddFightScreen(roosterId: rooster.id, fightToEdit: fight),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  // Widget de ayuda para construir las filas de detalles (Nombre: Valor)
   Widget _buildDetailRow(
     BuildContext context, {
     required IconData icon,
@@ -42,7 +71,12 @@ class RoosterDetailsScreen extends StatelessWidget {
           const SizedBox(width: 16),
           Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
           Expanded(
-            child: Text(value, textAlign: TextAlign.right, softWrap: true),
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              softWrap:
+                  true, // Permite que el texto largo salte a la siguiente línea
+            ),
           ),
         ],
       ),
@@ -56,7 +90,9 @@ class RoosterDetailsScreen extends StatelessWidget {
       rooster.birthDate.toDate(),
     );
     final RoosterService roosterService = RoosterService();
+    final FightService fightService = FightService();
 
+    // Lógica para determinar qué mostrar como linaje
     final String fatherDisplay =
         rooster.fatherName ?? rooster.fatherLineageText ?? 'No registrado';
     final String motherDisplay =
@@ -90,6 +126,7 @@ class RoosterDetailsScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Sección de Imagen
             rooster.imageUrl.isNotEmpty
                 ? CachedNetworkImage(
                     imageUrl: rooster.imageUrl,
@@ -118,6 +155,8 @@ class RoosterDetailsScreen extends StatelessWidget {
                       ),
                     ),
                   ),
+
+            // Sección de Información General
             Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
@@ -167,6 +206,83 @@ class RoosterDetailsScreen extends StatelessWidget {
                   ),
                 ],
               ),
+            ),
+
+            // Sección de Historial de Combate
+            StreamBuilder<DocumentSnapshot>(
+              stream: roosterService.getUserProfileStream(),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) return const SizedBox.shrink();
+
+                final userProfile = UserModel.fromFirestore(snapshot.data!);
+                if (userProfile.plan == 'iniciacion')
+                  return const SizedBox.shrink();
+
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Eventos de Combate",
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.add_circle,
+                              color: Colors.black,
+                            ),
+                            onPressed: () => _goToAddFightScreen(context),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      StreamBuilder<List<FightModel>>(
+                        stream: fightService.getFightsStream(rooster.id),
+                        builder: (context, fightSnapshot) {
+                          if (fightSnapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Center(
+                              child: CircularProgressIndicator(),
+                            );
+                          }
+                          if (!fightSnapshot.hasData ||
+                              fightSnapshot.data!.isEmpty) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(vertical: 24.0),
+                                child: Text(
+                                  "Este gallo aún no tiene eventos registrados.",
+                                ),
+                              ),
+                            );
+                          }
+
+                          final fights = fightSnapshot.data!;
+                          return ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: fights.length,
+                            separatorBuilder: (context, index) =>
+                                const SizedBox(height: 8),
+                            itemBuilder: (context, index) {
+                              final fight = fights[index];
+                              return FightTile(
+                                fight: fight,
+                                onTap: () =>
+                                    _goToEditFightScreen(context, fight),
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ],
         ),

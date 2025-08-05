@@ -7,7 +7,7 @@ class RoosterTile extends StatelessWidget {
   final String name;
   final String plate;
   final String status;
-  final String imageUrl; // Parámetro para la URL de la imagen
+  final String imageUrl;
   final VoidCallback onTap;
 
   const RoosterTile({
@@ -28,6 +28,10 @@ class RoosterTile extends StatelessWidget {
         return Colors.blue.shade600;
       case 'descansando':
         return Colors.orange.shade600;
+      case 'herido':
+        return Colors.purple.shade600;
+      case 'perdido en combate':
+        return Colors.black87;
       default:
         return Colors.grey.shade600;
     }
@@ -55,15 +59,12 @@ class RoosterTile extends StatelessWidget {
           leading: CircleAvatar(
             radius: 25,
             backgroundColor: Colors.grey[200],
-            // Lógica para mostrar la imagen de la red o un icono por defecto
             child: imageUrl.isNotEmpty
                 ? ClipOval(
                     child: CachedNetworkImage(
                       imageUrl: imageUrl,
-                      // Widget que se muestra mientras la imagen carga
                       placeholder: (context, url) =>
                           const CircularProgressIndicator(strokeWidth: 2.0),
-                      // Widget que se muestra si hay un error al cargar la imagen
                       errorWidget: (context, url, error) =>
                           const Icon(Icons.error_outline),
                       fit: BoxFit.cover,

@@ -3,8 +3,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:roozterfaceapp/screens/auth_gate.dart';
-
-// Importamos el paquete de Google Fonts
 import 'package:google_fonts/google_fonts.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -28,62 +26,64 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[300],
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Contenido principal centrado
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.shield_outlined, size: 120, color: Colors.grey[800]),
-                const SizedBox(
-                  height: 10,
-                ), // Un poco menos de espacio para juntarlos
-                // Texto de la marca con la fuente de impacto
-                Text(
-                  'Bienvenido a',
-                  style: GoogleFonts.roboto(
-                    fontSize: 35,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.grey[850],
-                  ),
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // Widget del Título Superior
+            Positioned(
+              top: 40.0,
+              left: 0,
+              right: 0,
+              child: Text(
+                'RoozterFace',
+                textAlign: TextAlign.center,
+                // --- ¡AQUÍ ESTÁ EL CAMBIO DE FUENTE! ---
+                style: GoogleFonts.cinzel(
+                  fontSize: 40,
+                  fontWeight:
+                      FontWeight.bold, // Cinzel se ve muy bien en negrita
+                  color: const Color(0xFFD4AF37),
+                  shadows: [
+                    const Shadow(
+                      blurRadius: 10.0,
+                      color: Colors.black54,
+                      offset: Offset(2.0, 2.0),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 15),
-
-                // ¡AQUÍ ESTÁ EL CAMBIO!
-                // Texto de bienvenida con la nueva fuente elegante
-                Text(
-                  'RoozterFace',
-                  style: GoogleFonts.roboto(
-                    // <-- ¡NUEVA FUENTE APLICADA!
-                    fontSize:
-                        40, // Tangerine necesita un tamaño más grande para ser legible
-                    fontWeight: FontWeight.bold,
-                    color: Colors.black54,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Marca "CodigoBardo" en la parte inferior
-          Positioned(
-            bottom: 40.0,
-            left: 0,
-            right: 0,
-            child: Text(
-              'by CodigoBardo',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.orbitron(
-                fontSize: 16,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
               ),
             ),
-          ),
-        ],
+
+            // Widget del Logo (sin cambios)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Image.asset(
+                  'assets/images/logo.jpg',
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+
+            // Widget de la marca "by CodigoBardo" (sin cambios)
+            Positioned(
+              bottom: 40.0,
+              left: 0,
+              right: 0,
+              child: Text(
+                'by CodigoBardo',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.orbitron(
+                  fontSize: 16,
+                  color: Colors.grey[600],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

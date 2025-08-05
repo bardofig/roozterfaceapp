@@ -5,18 +5,29 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class FightModel {
   final String id;
   final DateTime date;
-  final String location; // Lugar o Derby
-  final String opponent; // Placa o descripción del oponente
-  final String result; // "Victoria", "Derrota", "Tabla"
-  final String notes; // Observaciones sobre la pelea
+  final String location;
+  final String status;
+
+  final String? opponent;
+  final String? result;
+
+  final String? preparationNotes;
+  final String? postFightNotes;
+
+  // --- ¡NUEVO CAMPO CRUCIAL! ---
+  // Guardará 'true' o 'false'. Será nulo si la pelea está solo 'Programada'.
+  final bool? survived;
 
   FightModel({
     required this.id,
     required this.date,
     required this.location,
-    required this.opponent,
-    required this.result,
-    required this.notes,
+    required this.status,
+    this.opponent,
+    this.result,
+    this.preparationNotes,
+    this.postFightNotes,
+    this.survived, // Lo añadimos al constructor
   });
 
   factory FightModel.fromFirestore(DocumentSnapshot doc) {
@@ -25,9 +36,12 @@ class FightModel {
       id: doc.id,
       date: (data['date'] as Timestamp).toDate(),
       location: data['location'] ?? '',
-      opponent: data['opponent'] ?? '',
-      result: data['result'] ?? 'No registrado',
-      notes: data['notes'] ?? '',
+      status: data['status'] ?? 'Programado',
+      opponent: data['opponent'],
+      result: data['result'],
+      preparationNotes: data['preparationNotes'],
+      postFightNotes: data['postFightNotes'],
+      survived: data['survived'], // Leemos el nuevo campo desde Firestore
     );
   }
 }
