@@ -2,17 +2,21 @@
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:roozterfaceapp/screens/splash_screen.dart'; // Apunta a la pantalla de bienvenida
-import 'firebase_options.dart'; // Archivo de configuración de Firebase
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:intl/date_symbol_data_local.dart'; // <-- 1. IMPORTAR EL PAQUETE
+import 'package:roozterfaceapp/screens/splash_screen.dart';
+import 'firebase_options.dart';
 
 void main() async {
-  // Asegura que todos los bindings de Flutter estén listos antes de ejecutar la app
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Inicializa Firebase usando las opciones de configuración para la plataforma actual
+  // --- ¡ESTA ES LA CORRECCIÓN! ---
+  // 2. Inicializamos los datos de formato de fecha para todos los locales soportados.
+  // Es una operación asíncrona, por eso usamos 'await'.
+  await initializeDateFormatting();
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Ejecuta el widget raíz de la aplicación
   runApp(const MyApp());
 }
 
@@ -22,16 +26,18 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      // Desactiva la cinta de "Debug" en la esquina de la app
       debugShowCheckedModeBanner: false,
-      // El título de la aplicación, usado por el sistema operativo
       title: 'RoozterFace',
-      // Define el tema visual básico de la aplicación
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      // La primera pantalla que se mostrará al abrir la aplicación
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('es', '')],
       home: const SplashScreen(),
     );
   }

@@ -1,20 +1,227 @@
 // lib/screens/home_screen.dart
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:roozterfaceapp/models/rooster_model.dart';
+import 'package:roozterfaceapp/models/user_model.dart';
+import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
+import 'package:roozterfaceapp/screens/rooster_details_screen.dart';
+import 'package:roozterfaceapp/services/auth_service.dart';
+import 'package:roozterfaceapp/services/rooster_service.dart';
+import 'package:roozterfaceapp/widgets/rooster_tile.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final AuthService _authService = AuthService();
+  final RoosterService _roosterService = RoosterService();
+
+  void signOut() {
+    _authService.signOut();
+  }
+
+  void addRooster(String currentUserPlan) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            AddRoosterScreen(currentUserPlan: currentUserPlan),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  void goToRoosterDetails(RoosterModel rooster) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RoosterDetailsScreen(rooster: rooster),
+      ),
+    );
+  }
+
+  void _showLimitDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Límite Alcanzado"),
+          content: const Text(
+            "Has alcanzado el límite de 15 gallos para el Plan Iniciación. ¡Mejora tu plan para añadir más!",
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text("Entendido"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text("Mejorar Plan"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<bool> _deleteRooster(RoosterModel rooster) async {
+    try {
+      await _roosterService.deleteRooster(rooster);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('"${rooster.name}" ha sido borrado.')),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al borrar: ${e.toString()}')),
+        );
+      }
+      return false;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Página de Inicio'),
-        backgroundColor: Colors.blue,
-      ),
-      body: const Center(
-        child: Text('¡Has iniciado sesión!', style: TextStyle(fontSize: 24)),
-      ),
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _roosterService.getUserProfileStream(),
+      builder: (context, userSnapshot) {
+        if (userSnapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (!userSnapshot.hasData) {
+          return const Scaffold(
+            body: Center(
+              child: Text("No se pudo cargar el perfil del usuario."),
+            ),
+          );
+        }
+
+        final userProfile = UserModel.fromFirestore(userSnapshot.data!);
+        final isPlanIniciacion = userProfile.plan == 'iniciacion';
+
+        return StreamBuilder<List<RoosterModel>>(
+          stream: _roosterService.getRoostersStream(),
+          builder: (context, roosterSnapshot) {
+            if (roosterSnapshot.connectionState == ConnectionState.waiting) {
+              return const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              );
+            }
+            if (roosterSnapshot.hasError) {
+              return Scaffold(
+                body: Center(child: Text("Error: ${roosterSnapshot.error}")),
+              );
+            }
+
+            final roosters = roosterSnapshot.data ?? [];
+            final int roosterCount = roosters.length;
+            final bool canAddRooster = !isPlanIniciacion || roosterCount < 15;
+
+            return Scaffold(
+              backgroundColor: Colors.grey[200],
+              appBar: AppBar(
+                backgroundColor: Colors.grey[900],
+                foregroundColor: Colors.white,
+                title: const Text('Mis Gallos'),
+                actions: [
+                  IconButton(
+                    onPressed: signOut,
+                    icon: const Icon(Icons.logout),
+                  ),
+                ],
+              ),
+              body: roosters.isEmpty
+                  ? const Center(
+                      child: Text(
+                        "No tienes gallos registrados.\n¡Añade el primero!",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                    )
+                  : ListView.builder(
+                      itemCount: roosters.length,
+                      itemBuilder: (context, index) {
+                        final rooster = roosters[index];
+                        return Dismissible(
+                          key: Key(rooster.id),
+                          direction: DismissDirection.endToStart,
+                          background: Container(
+                            color: Colors.red,
+                            alignment: Alignment.centerRight,
+                            padding: const EdgeInsets.only(right: 20.0),
+                            child: const Icon(
+                              Icons.delete,
+                              color: Colors.white,
+                            ),
+                          ),
+                          confirmDismiss: (direction) async {
+                            bool? confirm = await showDialog<bool>(
+                              context: context,
+                              builder: (BuildContext context) {
+                                return AlertDialog(
+                                  title: const Text("Confirmar Borrado"),
+                                  content: Text(
+                                    "¿Estás seguro de que quieres borrar a \"${rooster.name}\"?",
+                                  ),
+                                  actions: <Widget>[
+                                    TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(false),
+                                      child: const Text("Cancelar"),
+                                    ),
+                                    TextButton(
+                                      style: TextButton.styleFrom(
+                                        foregroundColor: Colors.red,
+                                      ),
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(true),
+                                      child: const Text("Borrar"),
+                                    ),
+                                  ],
+                                );
+                              },
+                            );
+                            if (confirm != true) return false;
+
+                            return await _deleteRooster(rooster);
+                          },
+                          child: RoosterTile(
+                            name: rooster.name,
+                            plate: rooster.plate,
+                            status: rooster.status,
+                            imageUrl: rooster.imageUrl,
+                            onTap: () => goToRoosterDetails(rooster),
+                          ),
+                        );
+                      },
+                    ),
+              floatingActionButton: FloatingActionButton(
+                onPressed: () {
+                  if (canAddRooster) {
+                    addRooster(userProfile.plan);
+                  } else {
+                    _showLimitDialog();
+                  }
+                },
+                backgroundColor: canAddRooster ? Colors.black : Colors.grey,
+                child: const Icon(Icons.add, color: Colors.white),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

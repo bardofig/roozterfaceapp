@@ -1,5 +1,9 @@
+// lib/models/user_model.dart
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class UserModel {
-  final String uid; // El ID único de Firebase Auth
+  final String uid;
   final String email;
   final String fullName;
   final String mobilePhone;
@@ -10,7 +14,7 @@ class UserModel {
   final String neighborhood;
   final String city;
   final String country;
-  final String plan; // Para saber el tipo de suscripción
+  final String plan;
 
   UserModel({
     required this.uid,
@@ -24,10 +28,29 @@ class UserModel {
     required this.neighborhood,
     required this.city,
     required this.country,
-    this.plan = 'iniciacion', // Por defecto, todos empiezan en el plan gratuito
+    this.plan = 'iniciacion',
   });
 
-  // Método para convertir nuestro objeto a un formato que Firestore entienda (JSON)
+  // Método para crear una instancia de UserModel desde un snapshot de Firestore
+  factory UserModel.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    return UserModel(
+      uid: data['uid'] ?? '',
+      email: data['email'] ?? '',
+      fullName: data['fullName'] ?? '',
+      mobilePhone: data['mobilePhone'] ?? '',
+      street: data['street'] ?? '',
+      number: data['number'] ?? '',
+      betweenStreets: data['betweenStreets'] ?? '',
+      postalCode: data['postalCode'] ?? '',
+      neighborhood: data['neighborhood'] ?? '',
+      city: data['city'] ?? '',
+      country: data['country'] ?? '',
+      plan: data['plan'] ?? 'iniciacion',
+    );
+  }
+
+  // Método para convertir el objeto a un mapa para guardarlo en Firestore
   Map<String, dynamic> toJson() {
     return {
       'uid': uid,
