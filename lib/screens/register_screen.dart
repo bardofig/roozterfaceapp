@@ -1,7 +1,7 @@
 // lib/screens/register_screen.dart
 
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart'; // Importamos Google Fonts
+import 'package:google_fonts/google_fonts.dart';
 import 'package:roozterfaceapp/services/auth_service.dart';
 
 // --- WIDGETS DE AYUDA (HELPERS) ---
@@ -27,11 +27,13 @@ Widget _buildTextField({
   required String hintText,
   bool obscureText = false,
   TextInputType keyboardType = TextInputType.text,
+  TextCapitalization textCapitalization = TextCapitalization.none,
 }) {
   return TextField(
     controller: controller,
     obscureText: obscureText,
     keyboardType: keyboardType,
+    textCapitalization: textCapitalization,
     decoration: InputDecoration(
       enabledBorder: const OutlineInputBorder(
         borderSide: BorderSide(color: Colors.white),
@@ -179,18 +181,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     controller: passwordController,
                     hintText: 'Contraseña',
                     obscureText: true,
+                    keyboardType: TextInputType.visiblePassword,
                   ),
                   const SizedBox(height: 10),
                   _buildTextField(
                     controller: confirmPasswordController,
                     hintText: 'Confirmar Contraseña',
                     obscureText: true,
+                    keyboardType: TextInputType.visiblePassword,
                   ),
 
                   _buildSectionTitle('Datos Personales'),
                   _buildTextField(
                     controller: fullNameController,
                     hintText: 'Nombre Completo',
+                    textCapitalization: TextCapitalization.words,
                   ),
                   const SizedBox(height: 10),
                   _buildTextField(
@@ -203,16 +208,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _buildTextField(
                     controller: streetController,
                     hintText: 'Calle',
+                    textCapitalization: TextCapitalization.words,
                   ),
                   const SizedBox(height: 10),
                   _buildTextField(
                     controller: numberController,
                     hintText: 'Número',
+                    keyboardType: TextInputType.streetAddress,
                   ),
                   const SizedBox(height: 10),
                   _buildTextField(
                     controller: betweenStreetsController,
                     hintText: 'Entre Calles (Opcional)',
+                    textCapitalization: TextCapitalization.words,
                   ),
                   const SizedBox(height: 10),
                   _buildTextField(
@@ -224,16 +232,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   _buildTextField(
                     controller: neighborhoodController,
                     hintText: 'Colonia o Barrio',
+                    textCapitalization: TextCapitalization.words,
                   ),
                   const SizedBox(height: 10),
                   _buildTextField(
                     controller: cityController,
                     hintText: 'Ciudad o Municipio',
+                    textCapitalization: TextCapitalization.words,
                   ),
                   const SizedBox(height: 10),
                   _buildTextField(
                     controller: countryController,
                     hintText: 'País',
+                    textCapitalization: TextCapitalization.words,
                   ),
 
                   const SizedBox(height: 25),

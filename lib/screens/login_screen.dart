@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:roozterfaceapp/services/auth_service.dart'; // <-- 1. IMPORTAR EL SERVICIO
+import 'package:roozterfaceapp/services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   final void Function()? onTap;
@@ -13,17 +13,19 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  // Controladores para los campos de texto
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
-  // 2. CREAR INSTANCIA DEL SERVICIO
+  // Instancia de nuestro servicio de autenticación
   final AuthService _authService = AuthService();
 
-  // Método para mostrar errores
+  // Método para mostrar un pop-up con un mensaje de error
   void showErrorMessage(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: const Text('Error de Inicio de Sesión'),
         content: Text(message),
         actions: [
@@ -36,9 +38,9 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // 3. ACTUALIZAR EL MÉTODO signIn
+  // Método que se ejecuta al presionar el botón de Iniciar Sesión
   void signIn() async {
-    // Mostrar círculo de carga
+    // Mostrar un círculo de carga
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -53,9 +55,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       // Ocultar círculo de carga si todo sale bien
+      // El AuthGate se encargará de la redirección
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      // Ocultar círculo de carga y mostrar el error
+      // Si hay un error, ocultar el círculo de carga y mostrar el mensaje
       Navigator.pop(context);
       showErrorMessage(e.toString().replaceAll("Exception: ", ""));
     }
@@ -63,12 +66,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // La UI no cambia, solo la lógica del botón.
-    // Pego el build completo para consistencia.
     return Scaffold(
       backgroundColor: Colors.grey[300],
       body: SafeArea(
         child: Center(
+          // SingleChildScrollView previene que el teclado tape los campos de texto
           child: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 25.0),
@@ -91,8 +93,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 35),
+
+                  // Campo de texto para el Email
                   TextField(
                     controller: emailController,
+                    keyboardType: TextInputType
+                        .emailAddress, // Teclado optimizado para email
                     decoration: InputDecoration(
                       enabledBorder: const OutlineInputBorder(
                         borderSide: BorderSide(color: Colors.white),
@@ -107,9 +113,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 10),
+
+                  // Campo de texto para la Contraseña
                   TextField(
                     controller: passwordController,
                     obscureText: true,
+                    keyboardType: TextInputType
+                        .visiblePassword, // Teclado para contraseñas
                     decoration: InputDecoration(
                       enabledBorder: const OutlineInputBorder(
                         borderSide: BorderSide(color: Colors.white),
@@ -124,9 +134,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 25),
+
+                  // Botón de Iniciar Sesión
                   GestureDetector(
-                    onTap:
-                        signIn, // El onTap ahora llama a nuestro nuevo y poderoso método
+                    onTap: signIn, // Llama a nuestro método de lógica
                     child: Container(
                       padding: const EdgeInsets.all(25),
                       decoration: BoxDecoration(
@@ -146,6 +157,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 50),
+
+                  // Enlace para ir a la pantalla de Registro
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

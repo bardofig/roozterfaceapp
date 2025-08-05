@@ -38,20 +38,36 @@ class _SplashScreenState extends State<SplashScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.shield_outlined, size: 120, color: Colors.grey[800]),
-                const SizedBox(height: 20),
-                // CAMBIO: Nuevo texto y nueva fuente
+                const SizedBox(
+                  height: 10,
+                ), // Un poco menos de espacio para juntarlos
+                // Texto de la marca con la fuente de impacto
                 Text(
-                  'RoozterFace',
-                  style: GoogleFonts.germaniaOne(
-                    // <-- ¡LA NUEVA FUENTE!
-                    fontSize: 48, // Un tamaño más imponente
+                  'Bienvenido a',
+                  style: GoogleFonts.roboto(
+                    fontSize: 35,
                     fontWeight: FontWeight.bold,
                     color: Colors.grey[850],
+                  ),
+                ),
+                const SizedBox(height: 15),
+
+                // ¡AQUÍ ESTÁ EL CAMBIO!
+                // Texto de bienvenida con la nueva fuente elegante
+                Text(
+                  'RoozterFace',
+                  style: GoogleFonts.roboto(
+                    // <-- ¡NUEVA FUENTE APLICADA!
+                    fontSize:
+                        40, // Tangerine necesita un tamaño más grande para ser legible
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black54,
                   ),
                 ),
               ],
             ),
           ),
+
           // Marca "CodigoBardo" en la parte inferior
           Positioned(
             bottom: 40.0,
@@ -60,7 +76,6 @@ class _SplashScreenState extends State<SplashScreen> {
             child: Text(
               'by CodigoBardo',
               textAlign: TextAlign.center,
-              // Usamos una fuente más limpia aquí para no competir con el logo
               style: GoogleFonts.orbitron(
                 fontSize: 16,
                 color: Colors.grey[600],
