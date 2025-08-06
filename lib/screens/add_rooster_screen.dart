@@ -23,13 +23,11 @@ class AddRoosterScreen extends StatefulWidget {
 }
 
 class _AddRoosterScreenState extends State<AddRoosterScreen> {
-  // Controladores
   final _nameController = TextEditingController();
   final _plateController = TextEditingController();
   final _fatherLineageController = TextEditingController();
   final _motherLineageController = TextEditingController();
 
-  // Variables de Estado
   DateTime? _selectedDate;
   String? _selectedStatus;
   final List<String> _statuses = [
@@ -37,15 +35,13 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
     'En Venta',
     'Descansando',
     'Herido',
+    'Perdido en Combate',
   ];
   File? _selectedImage;
   final RoosterService _roosterService = RoosterService();
   bool _isSaving = false;
   String? _selectedFatherId;
   String? _selectedMotherId;
-
-  // Flag para controlar la inicialización de los IDs de linaje
-  bool _lineageIdsInitialized = false;
 
   @override
   void initState() {
@@ -56,6 +52,8 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
       _plateController.text = rooster.plate;
       _selectedDate = rooster.birthDate.toDate();
       _selectedStatus = rooster.status;
+      _selectedFatherId = rooster.fatherId;
+      _selectedMotherId = rooster.motherId;
       _fatherLineageController.text = rooster.fatherLineageText ?? '';
       _motherLineageController.text = rooster.motherLineageText ?? '';
     } else {
@@ -240,9 +238,22 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
           }
           final allRoosters = snapshot.data ?? [];
 
-          final possibleParents = allRoosters
-              .where((r) => isEditing ? r.id != widget.roosterToEdit!.id : true)
-              .toList();
+          // --- ¡ESTA ES LA CORRECCIÓN LÓGICA! ---
+          // Filtramos la lista para que solo incluya gallos que pueden ser padres/madres.
+          final List<String> breedingStatuses = ['activo', 'descansando'];
+          final possibleParents = allRoosters.where((r) {
+            // Un gallo puede ser padre/madre si:
+            // 1. No es el mismo gallo que estamos editando.
+            // 2. Su estado está en la lista de estados de cría.
+            final isNotSelf = isEditing
+                ? r.id != widget.roosterToEdit!.id
+                : true;
+            final isBreedable = breedingStatuses.contains(
+              r.status.toLowerCase(),
+            );
+            return isNotSelf && isBreedable;
+          }).toList();
+
           final dropdownItems = possibleParents.map((rooster) {
             return DropdownMenuItem<String>(
               value: rooster.id,
@@ -250,22 +261,17 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
             );
           }).toList();
 
-          // --- LÓGICA DE CORRECCIÓN ---
-          // Esta lógica ahora se ejecuta cada vez que el StreamBuilder se reconstruye,
-          // asegurando que los datos estén sincronizados.
-          if (isEditing && !_lineageIdsInitialized) {
-            final rooster = widget.roosterToEdit!;
-            if (rooster.fatherId != null &&
-                possibleParents.any((p) => p.id == rooster.fatherId)) {
-              _selectedFatherId = rooster.fatherId;
-            }
-            if (rooster.motherId != null &&
-                possibleParents.any((p) => p.id == rooster.motherId)) {
-              _selectedMotherId = rooster.motherId;
-            }
-            // Marcamos como inicializado para que esto no se ejecute en cada reconstrucción (ej: al escribir)
-            _lineageIdsInitialized = true;
-          }
+          final validFatherId =
+              _selectedFatherId != null &&
+                  possibleParents.any((p) => p.id == _selectedFatherId)
+              ? _selectedFatherId
+              : null;
+
+          final validMotherId =
+              _selectedMotherId != null &&
+                  possibleParents.any((p) => p.id == _selectedMotherId)
+              ? _selectedMotherId
+              : null;
 
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
@@ -376,7 +382,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: _selectedFatherId,
+                        value: validFatherId,
                         decoration: const InputDecoration(
                           labelText: 'Padre (Semental Registrado)',
                         ),
@@ -402,7 +408,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                       ),
                       const SizedBox(height: 24),
                       DropdownButtonFormField<String>(
-                        value: _selectedMotherId,
+                        value: validMotherId,
                         decoration: const InputDecoration(
                           labelText: 'Madre (Gallina Registrada)',
                         ),

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
 import 'package:roozterfaceapp/models/user_model.dart';
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
+// --- THIS IS THE MISSING AND CORRECTED IMPORT ---
 import 'package:roozterfaceapp/screens/rooster_details_screen.dart';
 import 'package:roozterfaceapp/services/auth_service.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';

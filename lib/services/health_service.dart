@@ -10,7 +10,6 @@ class HealthService {
 
   String? get currentUserId => _auth.currentUser?.uid;
 
-  // Obtiene una referencia a la sub-sub-colección de registros de salud
   CollectionReference _healthLogsCollection(String roosterId) {
     if (currentUserId == null) throw Exception("Usuario no autenticado.");
     return _firestore
@@ -21,7 +20,6 @@ class HealthService {
         .collection('health_logs');
   }
 
-  // Obtiene la lista de registros de salud para un gallo específico en tiempo real
   Stream<List<HealthLogModel>> getHealthLogsStream(String roosterId) {
     return _healthLogsCollection(
       roosterId,
@@ -32,32 +30,65 @@ class HealthService {
     });
   }
 
-  // --- ¡MÉTODO AÑADIDO Y FUNCIONAL! ---
-  // Añade un nuevo registro de salud a la base de datos
   Future<void> addHealthLog({
     required String roosterId,
     required DateTime date,
-    required String logType,
-    required String description,
+    required String logCategory,
+    required String productName,
+    String? illnessOrCondition,
+    String? dosage,
     required String notes,
   }) async {
-    if (currentUserId == null) {
-      throw Exception("Usuario no autenticado.");
-    }
     try {
-      // Preparamos los datos en un mapa para Firestore
       Map<String, dynamic> logData = {
         'date': Timestamp.fromDate(date),
-        'logType': logType,
-        'description': description,
+        'logCategory': logCategory,
+        'productName': productName,
+        'illnessOrCondition': illnessOrCondition,
+        'dosage': dosage,
         'notes': notes,
       };
-
-      // Añadimos el nuevo documento a la sub-sub-colección
       await _healthLogsCollection(roosterId).add(logData);
     } catch (e) {
-      print("Error al guardar el registro de salud: $e");
       throw Exception("Ocurrió un error al guardar el registro de salud.");
+    }
+  }
+
+  // --- ¡NUEVO MÉTODO UPDATE! ---
+  Future<void> updateHealthLog({
+    required String roosterId,
+    required String logId,
+    required DateTime date,
+    required String logCategory,
+    required String productName,
+    String? illnessOrCondition,
+    String? dosage,
+    required String notes,
+  }) async {
+    try {
+      Map<String, dynamic> logData = {
+        'date': Timestamp.fromDate(date),
+        'logCategory': logCategory,
+        'productName': productName,
+        'illnessOrCondition': illnessOrCondition,
+        'dosage': dosage,
+        'notes': notes,
+      };
+      await _healthLogsCollection(roosterId).doc(logId).update(logData);
+    } catch (e) {
+      throw Exception("Ocurrió un error al actualizar el registro de salud.");
+    }
+  }
+
+  // --- MÉTODO DELETE (ya estaba, pero lo confirmamos) ---
+  Future<void> deleteHealthLog({
+    required String roosterId,
+    required String logId,
+  }) async {
+    try {
+      await _healthLogsCollection(roosterId).doc(logId).delete();
+    } catch (e) {
+      throw Exception("Ocurrió un error al borrar el registro de salud.");
     }
   }
 }

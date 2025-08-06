@@ -10,8 +10,9 @@ import 'package:roozterfaceapp/models/health_log_model.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
 import 'package:roozterfaceapp/models/user_model.dart';
 import 'package:roozterfaceapp/screens/add_fight_screen.dart';
-import 'package:roozterfaceapp/screens/add_health_log_screen.dart'; // Crearemos este archivo después
+import 'package:roozterfaceapp/screens/add_health_log_screen.dart';
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
+import 'package:roozterfaceapp/screens/health_log_details_screen.dart';
 import 'package:roozterfaceapp/services/fight_service.dart';
 import 'package:roozterfaceapp/services/health_service.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';
@@ -20,28 +21,21 @@ import 'package:roozterfaceapp/widgets/health_log_tile.dart';
 
 class RoosterDetailsScreen extends StatefulWidget {
   final RoosterModel rooster;
-
   const RoosterDetailsScreen({super.key, required this.rooster});
-
   @override
   State<RoosterDetailsScreen> createState() => _RoosterDetailsScreenState();
 }
 
 class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+  TabController? _tabController;
   final RoosterService _roosterService = RoosterService();
-
-  @override
-  void initState() {
-    super.initState();
-    // Creamos un TabController con 3 pestañas
-    _tabController = TabController(length: 3, vsync: this);
-  }
+  final FightService _fightService = FightService();
+  final HealthService _healthService = HealthService();
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _tabController?.dispose();
     super.dispose();
   }
 
@@ -57,19 +51,84 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     );
   }
 
+  void _goToAddFightScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddFightScreen(roosterId: widget.rooster.id),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  void _goToEditFightScreen(FightModel fight) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            AddFightScreen(roosterId: widget.rooster.id, fightToEdit: fight),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  void _goToAddHealthLogScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddHealthLogScreen(roosterId: widget.rooster.id),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  void _goToHealthLogDetails(HealthLogModel log) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            HealthLogDetailsScreen(roosterId: widget.rooster.id, log: log),
+      ),
+    );
+  }
+
+  Future<bool> _deleteFight(FightModel fight) async {
+    try {
+      await _fightService.deleteFight(
+        roosterId: widget.rooster.id,
+        fightId: fight.id,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Evento de combate borrado.')),
+        );
+      }
+      return true;
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al borrar: ${e.toString()}')),
+        );
+      }
+      return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: StreamBuilder<DocumentSnapshot>(
         stream: _roosterService.getUserProfileStream(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+        builder: (context, userSnapshot) {
+          if (!userSnapshot.hasData)
             return const Center(child: CircularProgressIndicator());
-          }
-          final userProfile = UserModel.fromFirestore(snapshot.data!);
+          final userProfile = UserModel.fromFirestore(userSnapshot.data!);
           final bool isMaestroOrHigher = userProfile.plan != 'iniciacion';
-
-          // Usamos NestedScrollView para que la AppBar se oculte al hacer scroll
+          final int tabCount = isMaestroOrHigher ? 3 : 1;
+          if (_tabController == null || _tabController!.length != tabCount) {
+            _tabController?.dispose();
+            _tabController = TabController(length: tabCount, vsync: this);
+          }
           return NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
@@ -86,6 +145,7 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                     ),
                   ],
                   flexibleSpace: FlexibleSpaceBar(
+                    centerTitle: true,
                     title: Text(
                       widget.rooster.name,
                       style: const TextStyle(fontSize: 16.0),
@@ -94,9 +154,9 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                         ? CachedNetworkImage(
                             imageUrl: widget.rooster.imageUrl,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) =>
+                            placeholder: (c, u) =>
                                 Container(color: Colors.grey[300]),
-                            errorWidget: (context, url, error) =>
+                            errorWidget: (c, u, e) =>
                                 const Icon(Icons.broken_image),
                           )
                         : Container(
@@ -110,15 +170,16 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                             ),
                           ),
                   ),
-                  // Las Pestañas van aquí, en la parte inferior de la AppBar
                   bottom: TabBar(
                     controller: _tabController,
                     indicatorColor: Colors.white,
                     labelColor: Colors.white,
                     unselectedLabelColor: Colors.grey[400],
                     tabs: [
-                      const Tab(icon: Icon(Icons.info), text: 'General'),
-                      // Mostramos las pestañas premium solo si el plan lo permite
+                      const Tab(
+                        icon: Icon(Icons.info_outline),
+                        text: 'General',
+                      ),
                       if (isMaestroOrHigher)
                         const Tab(
                           icon: Icon(Icons.sports_kabaddi),
@@ -137,9 +198,7 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
             body: TabBarView(
               controller: _tabController,
               children: [
-                // Vista de la Pestaña 1: General
                 _buildGeneralInfoTab(),
-                // Vistas de las Pestañas Premium
                 if (isMaestroOrHigher) _buildFightsTab(),
                 if (isMaestroOrHigher) _buildHealthTab(),
               ],
@@ -149,8 +208,6 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
       ),
     );
   }
-
-  // --- WIDGETS PARA CADA PESTAÑA ---
 
   Widget _buildGeneralInfoTab() {
     final DateFormat formatter = DateFormat('dd de MMMM de yyyy', 'es_ES');
@@ -171,11 +228,6 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.rooster.name,
-            style: GoogleFonts.germaniaOne(fontSize: 32),
-          ),
-          const SizedBox(height: 16),
           _buildDetailRow(
             icon: Icons.badge,
             label: 'Placa',
@@ -216,7 +268,6 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
   }
 
   Widget _buildFightsTab() {
-    final FightService fightService = FightService();
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -229,11 +280,11 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                 "Programar Combate",
                 style: TextStyle(color: Colors.black),
               ),
-              onPressed: () => _goToAddFightScreen(),
+              onPressed: _goToAddFightScreen,
             ),
           ),
           StreamBuilder<List<FightModel>>(
-            stream: fightService.getFightsStream(widget.rooster.id),
+            stream: _fightService.getFightsStream(widget.rooster.id),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting)
                 return const CircularProgressIndicator();
@@ -249,9 +300,45 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                 itemCount: fights.length,
                 itemBuilder: (context, index) {
                   final fight = fights[index];
-                  return FightTile(
-                    fight: fight,
-                    onTap: () => _goToEditFightScreen(fight),
+                  return Dismissible(
+                    key: Key(fight.id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      color: Colors.red,
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20.0),
+                      child: const Icon(Icons.delete, color: Colors.white),
+                    ),
+                    confirmDismiss: (direction) async {
+                      bool? confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: const Text("Confirmar Borrado"),
+                          content: const Text(
+                            "¿Estás seguro de que quieres borrar este evento de combate?",
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(c).pop(false),
+                              child: const Text("Cancelar"),
+                            ),
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.red,
+                              ),
+                              onPressed: () => Navigator.of(c).pop(true),
+                              child: const Text("Borrar"),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm != true) return false;
+                      return await _deleteFight(fight);
+                    },
+                    child: FightTile(
+                      fight: fight,
+                      onTap: () => _goToEditFightScreen(fight),
+                    ),
                   );
                 },
               );
@@ -263,7 +350,6 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
   }
 
   Widget _buildHealthTab() {
-    final HealthService healthService = HealthService();
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -276,19 +362,11 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                 "Añadir Registro",
                 style: TextStyle(color: Colors.black),
               ),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        AddHealthLogScreen(roosterId: widget.rooster.id),
-                  ),
-                );
-              },
+              onPressed: _goToAddHealthLogScreen,
             ),
           ),
           StreamBuilder<List<HealthLogModel>>(
-            stream: healthService.getHealthLogsStream(widget.rooster.id),
+            stream: _healthService.getHealthLogsStream(widget.rooster.id),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting)
                 return const CircularProgressIndicator();
@@ -302,34 +380,17 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: logs.length,
-                itemBuilder: (context, index) =>
-                    HealthLogTile(log: logs[index]),
+                itemBuilder: (context, index) {
+                  final log = logs[index];
+                  return HealthLogTile(
+                    log: log,
+                    onTap: () => _goToHealthLogDetails(log),
+                  );
+                },
               );
             },
           ),
         ],
-      ),
-    );
-  }
-
-  // Métodos de navegación y ayuda (los necesitamos aquí también)
-  void _goToAddFightScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddFightScreen(roosterId: widget.rooster.id),
-        fullscreenDialog: true,
-      ),
-    );
-  }
-
-  void _goToEditFightScreen(FightModel fight) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) =>
-            AddFightScreen(roosterId: widget.rooster.id, fightToEdit: fight),
-        fullscreenDialog: true,
       ),
     );
   }

@@ -2,40 +2,92 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:roozterfaceapp/services/health_service.dart'; // Importamos el servicio
+import 'package:roozterfaceapp/models/health_log_model.dart';
+import 'package:roozterfaceapp/services/health_service.dart';
 
 class AddHealthLogScreen extends StatefulWidget {
   final String roosterId;
+  final HealthLogModel? logToEdit; // Parámetro opcional para el modo edición
 
-  const AddHealthLogScreen({super.key, required this.roosterId});
+  const AddHealthLogScreen({
+    super.key,
+    required this.roosterId,
+    this.logToEdit,
+  });
 
   @override
   State<AddHealthLogScreen> createState() => _AddHealthLogScreenState();
 }
 
 class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
-  // Controladores y variables para el formulario
-  final _descriptionController = TextEditingController();
+  // Controladores
+  final _productNameController = TextEditingController();
+  final _conditionController = TextEditingController();
+  final _dosageController = TextEditingController();
   final _notesController = TextEditingController();
-  DateTime? _selectedDate;
 
-  // Opciones para el tipo de registro
-  String? _selectedLogType = 'Vacunación'; // Valor por defecto
-  final List<String> _logTypes = [
+  // Variables de estado
+  DateTime? _selectedDate;
+  String? _selectedLogCategory;
+  final List<String> _logCategories = [
     'Vacunación',
     'Desparasitación',
-    'Vitamina',
-    'Tratamiento',
+    'Suplemento/Vitamina',
+    'Enfermedad/Tratamiento',
+  ];
+  String? _selectedIllness;
+  final List<String> _commonIllnesses = [
+    'Corisa Infecciosa',
+    'Cólera Aviar',
+    'Colibacilosis',
+    'Micoplasmosis',
+    'Salmonelosis',
+    'Tuberculosis',
+    'Bronquitis Infecciosa',
+    'Enfermedad de Marek',
+    'Enfermedad de Newcastle',
+    'Viruela Aviar',
+    'Ascaridiosis (Parásitos Int.)',
+    'Coccidiosis',
+    'Parásitos Externos (Piojo/Ácaro)',
+    'Herida de Combate',
+    'Otra...',
   ];
 
   final HealthService _healthService = HealthService();
   bool _isSaving = false;
+  bool get _isEditing => widget.logToEdit != null;
 
   @override
   void initState() {
     super.initState();
-    // Inicializamos la fecha con el día de hoy por defecto para agilizar el registro
-    _selectedDate = DateTime.now();
+    // --- LÓGICA DE INICIALIZACIÓN CORREGIDA ---
+    if (_isEditing) {
+      // Si estamos editando, llenamos los campos con los datos del registro existente
+      final log = widget.logToEdit!;
+      _productNameController.text = log.productName;
+      _dosageController.text = log.dosage ?? '';
+      _notesController.text = log.notes;
+      _selectedDate = log.date;
+      _selectedLogCategory = log.logCategory;
+
+      // Lógica para manejar la enfermedad/condición
+      if (log.illnessOrCondition != null &&
+          log.illnessOrCondition!.isNotEmpty) {
+        // Comprobamos si la condición guardada está en nuestra lista de enfermedades comunes
+        if (_commonIllnesses.contains(log.illnessOrCondition)) {
+          _selectedIllness = log.illnessOrCondition;
+        } else {
+          // Si no está en la lista, significa que fue una entrada manual
+          _selectedIllness = 'Otra...';
+          _conditionController.text = log.illnessOrCondition!;
+        }
+      }
+    } else {
+      // Valores por defecto al crear un nuevo registro
+      _selectedLogCategory = 'Vacunación';
+      _selectedDate = DateTime.now();
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -43,7 +95,7 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
       context: context,
       initialDate: _selectedDate ?? DateTime.now(),
       firstDate: DateTime(2000),
-      lastDate: DateTime.now(), // No se pueden registrar cuidados a futuro
+      lastDate: DateTime.now(),
     );
     if (picked != null && picked != _selectedDate) {
       setState(() {
@@ -52,16 +104,31 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
     }
   }
 
-  // --- MÉTODO PARA GUARDAR EL REGISTRO (Lógica pendiente en el servicio) ---
   Future<void> _saveHealthLog() async {
-    // Validación de campos
-    if (_selectedDate == null || _descriptionController.text.isEmpty) {
+    if (_selectedDate == null || _productNameController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Por favor, completa la Fecha y la Descripción.'),
+          content: Text(
+            'Por favor, completa la Fecha y el Nombre del Producto.',
+          ),
         ),
       );
       return;
+    }
+
+    String? conditionToSave;
+    if (_selectedLogCategory == 'Enfermedad/Tratamiento') {
+      conditionToSave = (_selectedIllness == 'Otra...')
+          ? _conditionController.text
+          : _selectedIllness;
+      if (conditionToSave == null || conditionToSave.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Por favor, selecciona o especifica una condición.'),
+          ),
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -69,20 +136,36 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
     });
 
     try {
-      // En el siguiente paso, crearemos este método en el servicio
-      await _healthService.addHealthLog(
-        roosterId: widget.roosterId,
-        date: _selectedDate!,
-        logType: _selectedLogType!,
-        description: _descriptionController.text,
-        notes: _notesController.text,
-      );
-
+      if (_isEditing) {
+        await _healthService.updateHealthLog(
+          roosterId: widget.roosterId,
+          logId: widget.logToEdit!.id,
+          date: _selectedDate!,
+          logCategory: _selectedLogCategory!,
+          productName: _productNameController.text,
+          illnessOrCondition: conditionToSave,
+          dosage: _dosageController.text,
+          notes: _notesController.text,
+        );
+      } else {
+        await _healthService.addHealthLog(
+          roosterId: widget.roosterId,
+          date: _selectedDate!,
+          logCategory: _selectedLogCategory!,
+          productName: _productNameController.text,
+          illnessOrCondition: conditionToSave,
+          dosage: _dosageController.text,
+          notes: _notesController.text,
+        );
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Registro de salud guardado.')),
         );
-        Navigator.of(context).pop();
+        Navigator.of(context).pop(); // Cierra el formulario de edición
+        if (_isEditing) {
+          Navigator.of(context).pop(); // Cierra también la pantalla de detalles
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -103,7 +186,9 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Añadir Registro de Salud'),
+        title: Text(
+          _isEditing ? 'Editar Registro de Salud' : 'Añadir Registro de Salud',
+        ),
         backgroundColor: Colors.grey[900],
         foregroundColor: Colors.white,
       ),
@@ -112,24 +197,30 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Selector de Tipo de Registro
             DropdownButtonFormField<String>(
-              value: _selectedLogType,
+              value: _selectedLogCategory,
               decoration: const InputDecoration(
-                labelText: 'Tipo de Registro *',
+                labelText: 'Categoría del Registro *',
               ),
-              items: _logTypes.map((String type) {
-                return DropdownMenuItem<String>(value: type, child: Text(type));
-              }).toList(),
+              items: _logCategories
+                  .map(
+                    (String category) => DropdownMenuItem<String>(
+                      value: category,
+                      child: Text(category),
+                    ),
+                  )
+                  .toList(),
               onChanged: (newValue) {
                 setState(() {
-                  _selectedLogType = newValue;
+                  _selectedLogCategory = newValue;
+                  if (newValue != 'Enfermedad/Tratamiento') {
+                    _selectedIllness = null;
+                    _conditionController.clear();
+                  }
                 });
               },
             ),
             const SizedBox(height: 16),
-
-            // Selector de Fecha
             Row(
               children: [
                 Expanded(
@@ -147,29 +238,62 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Campo de texto para Descripción
             TextField(
-              controller: _descriptionController,
+              controller: _productNameController,
               decoration: const InputDecoration(
-                labelText: 'Descripción (Producto, Tratamiento, etc.) *',
+                labelText: 'Nombre del Producto/Tratamiento *',
               ),
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: 16),
-
-            // Campo de texto para Notas
+            if (_selectedLogCategory == 'Enfermedad/Tratamiento')
+              Column(
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: _selectedIllness,
+                    decoration: const InputDecoration(
+                      labelText: 'Enfermedad o Condición *',
+                    ),
+                    items: _commonIllnesses
+                        .map(
+                          (String illness) => DropdownMenuItem<String>(
+                            value: illness,
+                            child: Text(illness),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (newValue) {
+                      setState(() {
+                        _selectedIllness = newValue;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  if (_selectedIllness == 'Otra...')
+                    TextField(
+                      controller: _conditionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Especificar otra condición *',
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                    ),
+                  if (_selectedIllness == 'Otra...') const SizedBox(height: 16),
+                ],
+              ),
+            TextField(
+              controller: _dosageController,
+              decoration: const InputDecoration(
+                labelText: 'Dosis (ej: 0.5 ml, 1 pastilla)',
+              ),
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: _notesController,
-              decoration: const InputDecoration(
-                labelText: 'Notas (Dosis, Observaciones, etc.)',
-              ),
-              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'Notas Adicionales'),
+              maxLines: 3,
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: 32),
-
-            // Botón de Guardar
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -181,7 +305,7 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
                 ),
                 child: _isSaving
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Guardar Registro'),
+                    : const Text('Guardar Cambios'),
               ),
             ),
           ],
