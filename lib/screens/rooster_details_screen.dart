@@ -209,6 +209,7 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     );
   }
 
+  // --- ¡PESTAÑA GENERAL ACTUALIZADA! ---
   Widget _buildGeneralInfoTab() {
     final DateFormat formatter = DateFormat('dd de MMMM de yyyy', 'es_ES');
     final String formattedBirthDate = formatter.format(
@@ -228,6 +229,7 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // --- Sección de Datos Básicos ---
           _buildDetailRow(
             icon: Icons.badge,
             label: 'Placa',
@@ -248,6 +250,40 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
             value: widget.rooster.status,
           ),
           const Divider(),
+
+          // --- Sección de Características Físicas ---
+          const SizedBox(height: 16),
+          Text(
+            "Características",
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 8),
+          _buildDetailRow(
+            icon: Icons.shield,
+            label: 'Línea / Casta',
+            value: widget.rooster.breedLine ?? 'No registrada',
+          ),
+          const Divider(),
+          _buildDetailRow(
+            icon: Icons.palette,
+            label: 'Color',
+            value: widget.rooster.color ?? 'No registrado',
+          ),
+          const Divider(),
+          _buildDetailRow(
+            icon: Icons.content_cut,
+            label: 'Tipo de Cresta',
+            value: widget.rooster.combType ?? 'No registrado',
+          ),
+          const Divider(),
+          _buildDetailRow(
+            icon: Icons.square_foot,
+            label: 'Color de Patas',
+            value: widget.rooster.legColor ?? 'No registrado',
+          ),
+          const Divider(),
+
+          // --- Sección de Linaje (Ahora separada) ---
           const SizedBox(height: 16),
           Text("Linaje", style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),

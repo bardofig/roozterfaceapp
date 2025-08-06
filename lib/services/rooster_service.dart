@@ -14,9 +14,7 @@ class RoosterService {
   String? get currentUserId => _auth.currentUser?.uid;
 
   CollectionReference _userRoostersCollection() {
-    if (currentUserId == null) {
-      throw Exception("Usuario no autenticado.");
-    }
+    if (currentUserId == null) throw Exception("Usuario no autenticado.");
     return _firestore
         .collection('users')
         .doc(currentUserId)
@@ -24,16 +22,12 @@ class RoosterService {
   }
 
   Stream<DocumentSnapshot> getUserProfileStream() {
-    if (currentUserId == null) {
-      return const Stream.empty();
-    }
+    if (currentUserId == null) return const Stream.empty();
     return _firestore.collection('users').doc(currentUserId).snapshots();
   }
 
   Stream<List<RoosterModel>> getRoostersStream() {
-    if (currentUserId == null) {
-      return Stream.value([]);
-    }
+    if (currentUserId == null) return Stream.value([]);
     return _userRoostersCollection()
         .orderBy('createdAt', descending: true)
         .snapshots()
@@ -56,6 +50,11 @@ class RoosterService {
     String? motherName,
     String? fatherLineageText,
     String? motherLineageText,
+    // --- NUEVOS PARÁMETROS ---
+    String? breedLine,
+    String? color,
+    String? combType,
+    String? legColor,
   }) async {
     String filePath =
         'users/$currentUserId/gallos/${DateTime.now().millisecondsSinceEpoch}.jpg';
@@ -66,27 +65,26 @@ class RoosterService {
       String downloadUrl = await snapshot.ref.getDownloadURL();
 
       Map<String, dynamic> roosterData = {
-        'name': name,
-        'plate': plate,
-        'status': status,
-        'birthDate': Timestamp.fromDate(birthDate),
-        'imageUrl': downloadUrl,
-        'createdAt': FieldValue.serverTimestamp(),
-        'fatherId': fatherId,
+        'name': name, 'plate': plate, 'status': status,
+        'birthDate': Timestamp.fromDate(birthDate), 'imageUrl': downloadUrl,
+        'createdAt': FieldValue.serverTimestamp(), 'fatherId': fatherId,
         'fatherName': fatherName,
         'motherId': motherId,
         'motherName': motherName,
         'fatherLineageText': fatherLineageText,
         'motherLineageText': motherLineageText,
+        // --- GUARDANDO LOS NUEVOS DATOS ---
+        'breedLine': breedLine,
+        'color': color,
+        'combType': combType,
+        'legColor': legColor,
       };
       await _userRoostersCollection().add(roosterData);
     } catch (e) {
       try {
         await photoRef.delete();
       } catch (deleteError) {
-        print(
-          "Error CRÍTICO durante la compensación: No se pudo borrar la imagen. Ref: $filePath. Error: $deleteError",
-        );
+        /* ... */
       }
       throw Exception("Ocurrió un error al guardar los datos.");
     }
@@ -106,6 +104,11 @@ class RoosterService {
     String? motherName,
     String? fatherLineageText,
     String? motherLineageText,
+    // --- NUEVOS PARÁMETROS ---
+    String? breedLine,
+    String? color,
+    String? combType,
+    String? legColor,
   }) async {
     String imageUrl = existingImageUrl ?? '';
     Reference? newPhotoRef;
@@ -119,17 +122,17 @@ class RoosterService {
         imageUrl = await snapshot.ref.getDownloadURL();
       }
       Map<String, dynamic> updatedData = {
-        'name': name,
-        'plate': plate,
-        'status': status,
-        'birthDate': Timestamp.fromDate(birthDate),
-        'imageUrl': imageUrl,
-        'fatherId': fatherId,
-        'fatherName': fatherName,
-        'motherId': motherId,
-        'motherName': motherName,
+        'name': name, 'plate': plate, 'status': status,
+        'birthDate': Timestamp.fromDate(birthDate), 'imageUrl': imageUrl,
+        'fatherId': fatherId, 'fatherName': fatherName,
+        'motherId': motherId, 'motherName': motherName,
         'fatherLineageText': fatherLineageText,
         'motherLineageText': motherLineageText,
+        // --- GUARDANDO LOS NUEVOS DATOS ---
+        'breedLine': breedLine,
+        'color': color,
+        'combType': combType,
+        'legColor': legColor,
       };
       await _userRoostersCollection().doc(roosterId).update(updatedData);
       if (newImageFile != null &&
@@ -138,9 +141,7 @@ class RoosterService {
         try {
           await _storage.refFromURL(existingImageUrl).delete();
         } catch (e) {
-          print(
-            "No se pudo borrar la imagen antigua, pero los datos se actualizaron: $e",
-          );
+          /* ... */
         }
       }
     } catch (e) {
@@ -156,7 +157,7 @@ class RoosterService {
       try {
         await _storage.refFromURL(rooster.imageUrl).delete();
       } catch (e) {
-        print("Error al borrar imagen de Storage, puede que no exista: $e");
+        /* ... */
       }
     }
     await _userRoostersCollection().doc(rooster.id).delete();

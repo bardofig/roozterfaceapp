@@ -7,7 +7,7 @@ import 'package:roozterfaceapp/services/health_service.dart';
 
 class AddHealthLogScreen extends StatefulWidget {
   final String roosterId;
-  final HealthLogModel? logToEdit; // Parámetro opcional para el modo edición
+  final HealthLogModel? logToEdit; // Parámetro opcional para modo edición
 
   const AddHealthLogScreen({
     super.key,

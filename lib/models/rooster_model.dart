@@ -10,15 +10,19 @@ class RoosterModel {
   final Timestamp birthDate;
   final String imageUrl;
 
-  // Linaje por Selección
+  // Linaje por Selección y Texto
   final String? fatherId;
   final String? fatherName;
   final String? motherId;
   final String? motherName;
+  final String? fatherLineageText;
+  final String? motherLineageText;
 
-  // --- ¡NUEVOS CAMPOS PARA TEXTO LIBRE! ---
-  final String? fatherLineageText; // Para linaje paterno manual
-  final String? motherLineageText; // Para linaje materno manual
+  // --- ¡NUEVOS CAMPOS DE REFINAMIENTO! ---
+  final String? breedLine; // Línea/Casta (ej: "Kelso", "Sweater")
+  final String? color;
+  final String? combType; // Tipo de cresta
+  final String? legColor;
 
   RoosterModel({
     required this.id,
@@ -33,6 +37,11 @@ class RoosterModel {
     this.motherName,
     this.fatherLineageText,
     this.motherLineageText,
+    // Añadimos los nuevos campos al constructor
+    this.breedLine,
+    this.color,
+    this.combType,
+    this.legColor,
   });
 
   factory RoosterModel.fromFirestore(DocumentSnapshot doc) {
@@ -49,9 +58,13 @@ class RoosterModel {
       fatherName: data['fatherName'],
       motherId: data['motherId'],
       motherName: data['motherName'],
-      // Leemos los nuevos campos
       fatherLineageText: data['fatherLineageText'],
       motherLineageText: data['motherLineageText'],
+      // Leemos los nuevos campos desde Firestore
+      breedLine: data['breedLine'],
+      color: data['color'],
+      combType: data['combType'],
+      legColor: data['legColor'],
     );
   }
 }
