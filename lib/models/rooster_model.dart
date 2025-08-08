@@ -10,7 +10,7 @@ class RoosterModel {
   final Timestamp birthDate;
   final String imageUrl;
 
-  // Linaje por Selección y Texto
+  // Linaje
   final String? fatherId;
   final String? fatherName;
   final String? motherId;
@@ -18,11 +18,16 @@ class RoosterModel {
   final String? fatherLineageText;
   final String? motherLineageText;
 
-  // --- ¡NUEVOS CAMPOS DE REFINAMIENTO! ---
-  final String? breedLine; // Línea/Casta (ej: "Kelso", "Sweater")
+  // Características
+  final String? breedLine;
   final String? color;
-  final String? combType; // Tipo de cresta
+  final String? combType;
   final String? legColor;
+
+  // --- ¡NUEVOS CAMPOS PARA VENTAS! ---
+  final double? salePrice; // Precio de venta
+  final Timestamp? saleDate; // Fecha de venta
+  final String? buyerName; // Nombre del comprador
 
   RoosterModel({
     required this.id,
@@ -37,11 +42,14 @@ class RoosterModel {
     this.motherName,
     this.fatherLineageText,
     this.motherLineageText,
-    // Añadimos los nuevos campos al constructor
     this.breedLine,
     this.color,
     this.combType,
     this.legColor,
+    // Añadimos al constructor
+    this.salePrice,
+    this.saleDate,
+    this.buyerName,
   });
 
   factory RoosterModel.fromFirestore(DocumentSnapshot doc) {
@@ -60,11 +68,31 @@ class RoosterModel {
       motherName: data['motherName'],
       fatherLineageText: data['fatherLineageText'],
       motherLineageText: data['motherLineageText'],
-      // Leemos los nuevos campos desde Firestore
       breedLine: data['breedLine'],
       color: data['color'],
       combType: data['combType'],
       legColor: data['legColor'],
+      // Leemos los nuevos campos
+      salePrice: (data['salePrice'] as num?)?.toDouble(),
+      saleDate: data['saleDate'],
+      buyerName: data['buyerName'],
     );
+  }
+
+  // Método para convertir los datos a un mapa para guardarlos en Firestore
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name, 'plate': plate, 'status': status,
+      'birthDate': birthDate, 'imageUrl': imageUrl,
+      'fatherId': fatherId, 'fatherName': fatherName,
+      'motherId': motherId, 'motherName': motherName,
+      'fatherLineageText': fatherLineageText,
+      'motherLineageText': motherLineageText,
+      'breedLine': breedLine, 'color': color,
+      'combType': combType, 'legColor': legColor,
+      'salePrice': salePrice, 'saleDate': saleDate, 'buyerName': buyerName,
+      'createdAt':
+          FieldValue.serverTimestamp(), // Aseguramos que este campo se mantenga
+    };
   }
 }

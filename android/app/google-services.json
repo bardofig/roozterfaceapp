@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:272367103913:android:3b1663f2151ebf06c39eb8",
+        "mobilesdk_app_id": "1:272367103913:android:626c8e1040fe9450c39eb8",
         "android_client_info": {
-          "package_name": "com.example.roozterfaceapp"
+          "package_name": "com.codigobardo.roozterface"
         }
       },
       "oauth_client": [],

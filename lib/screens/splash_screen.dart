@@ -39,12 +39,10 @@ class _SplashScreenState extends State<SplashScreen> {
               child: Text(
                 'RoozterFace',
                 textAlign: TextAlign.center,
-                // --- ¡AQUÍ ESTÁ EL CAMBIO DE FUENTE! ---
                 style: GoogleFonts.cinzel(
                   fontSize: 40,
-                  fontWeight:
-                      FontWeight.bold, // Cinzel se ve muy bien en negrita
-                  color: const Color(0xFFD4AF37),
+                  fontWeight: FontWeight.bold,
+                  color: const Color(0xFFD4AF37), // Dorado clásico
                   shadows: [
                     const Shadow(
                       blurRadius: 10.0,
@@ -67,7 +65,7 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
 
-            // Widget de la marca "by CodigoBardo" (sin cambios)
+            // Widget de la marca "by CodigoBardo" (con estilo actualizado)
             Positioned(
               bottom: 40.0,
               left: 0,
@@ -76,9 +74,19 @@ class _SplashScreenState extends State<SplashScreen> {
                 'by CodigoBardo',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.orbitron(
-                  fontSize: 16,
-                  color: Colors.grey[600],
+                  fontSize: 18, // Ligeramente más grande para más impacto
+                  // --- ¡NUEVO COLOR DORADO MÁS BRILLANTE! ---
+                  // FFD700 es el código hexadecimal estándar para "Gold"
+                  color: const Color(0xFFFFD700),
                   fontWeight: FontWeight.w500,
+                  // Añadimos una sombra para que resalte
+                  shadows: [
+                    const Shadow(
+                      blurRadius: 8.0,
+                      color: Colors.black87,
+                      offset: Offset(1.0, 1.0),
+                    ),
+                  ],
                 ),
               ),
             ),

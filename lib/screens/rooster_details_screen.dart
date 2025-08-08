@@ -120,8 +120,9 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
       body: StreamBuilder<DocumentSnapshot>(
         stream: _roosterService.getUserProfileStream(),
         builder: (context, userSnapshot) {
-          if (!userSnapshot.hasData)
+          if (!userSnapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
           final userProfile = UserModel.fromFirestore(userSnapshot.data!);
           final bool isMaestroOrHigher = userProfile.plan != 'iniciacion';
           final int tabCount = isMaestroOrHigher ? 3 : 1;
@@ -322,13 +323,15 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
           StreamBuilder<List<FightModel>>(
             stream: _fightService.getFightsStream(widget.rooster.id),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const CircularProgressIndicator();
-              if (!snapshot.hasData || snapshot.data!.isEmpty)
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24.0),
                   child: Text("No hay eventos registrados."),
                 );
+              }
               final fights = snapshot.data!;
               return ListView.builder(
                 shrinkWrap: true,
@@ -404,13 +407,15 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
           StreamBuilder<List<HealthLogModel>>(
             stream: _healthService.getHealthLogsStream(widget.rooster.id),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const CircularProgressIndicator();
-              if (!snapshot.hasData || snapshot.data!.isEmpty)
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24.0),
                   child: Text("No hay registros de salud."),
                 );
+              }
               final logs = snapshot.data!;
               return ListView.builder(
                 shrinkWrap: true,

@@ -3,21 +3,26 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:intl/date_symbol_data_local.dart'; // <-- 1. IMPORTAR EL PAQUETE
+import 'package:intl/date_symbol_data_local.dart';
+import 'package:provider/provider.dart'; // Importamos Provider
 import 'package:roozterfaceapp/screens/splash_screen.dart';
+import 'package:roozterfaceapp/services/payment_service.dart';
+import 'package:roozterfaceapp/theme/theme_provider.dart'; // Importamos nuestro proveedor
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // --- ¡ESTA ES LA CORRECCIÓN! ---
-  // 2. Inicializamos los datos de formato de fecha para todos los locales soportados.
-  // Es una operación asíncrona, por eso usamos 'await'.
   await initializeDateFormatting();
-
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  PaymentService().initialize();
 
-  runApp(const MyApp());
+  // Envolvemos nuestra app con el ChangeNotifierProvider
+  runApp(
+    ChangeNotifierProvider(
+      create: (context) => ThemeProvider(),
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -28,10 +33,8 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'RoozterFace',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      // El tema ahora se obtiene dinámicamente del proveedor
+      theme: Provider.of<ThemeProvider>(context).themeData,
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
