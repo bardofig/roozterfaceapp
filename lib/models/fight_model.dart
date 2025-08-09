@@ -10,13 +10,15 @@ class FightModel {
 
   final String? opponent;
   final String? result;
+  final bool? survived;
 
   final String? preparationNotes;
   final String? postFightNotes;
 
-  // --- ¡NUEVO CAMPO CRUCIAL! ---
-  // Guardará 'true' o 'false'. Será nulo si la pelea está solo 'Programada'.
-  final bool? survived;
+  // --- ¡NUEVOS CAMPOS ENRIQUECIDOS! ---
+  final String? weaponType;
+  final String? fightDuration;
+  final String? injuriesSustained;
 
   FightModel({
     required this.id,
@@ -25,9 +27,12 @@ class FightModel {
     required this.status,
     this.opponent,
     this.result,
+    this.survived,
     this.preparationNotes,
     this.postFightNotes,
-    this.survived, // Lo añadimos al constructor
+    this.weaponType,
+    this.fightDuration,
+    this.injuriesSustained,
   });
 
   factory FightModel.fromFirestore(DocumentSnapshot doc) {
@@ -39,9 +44,12 @@ class FightModel {
       status: data['status'] ?? 'Programado',
       opponent: data['opponent'],
       result: data['result'],
+      survived: data['survived'],
       preparationNotes: data['preparationNotes'],
       postFightNotes: data['postFightNotes'],
-      survived: data['survived'], // Leemos el nuevo campo desde Firestore
+      weaponType: data['weaponType'],
+      fightDuration: data['fightDuration'],
+      injuriesSustained: data['injuriesSustained'],
     );
   }
 }

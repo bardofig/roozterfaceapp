@@ -6,12 +6,10 @@ import 'package:roozterfaceapp/models/fight_model.dart';
 
 class FightTile extends StatelessWidget {
   final FightModel fight;
-  final VoidCallback
-  onTap; // Para permitir que sea "tocable" y abrir el formulario de edición
+  final VoidCallback onTap;
 
   const FightTile({super.key, required this.fight, required this.onTap});
 
-  // Función para obtener el estilo del chip de estado/resultado
   Map<String, dynamic> _getStatusStyle(String status, String? result) {
     if (status == 'Programado') {
       return {
@@ -20,7 +18,6 @@ class FightTile extends StatelessWidget {
         'text': 'Programado',
       };
     }
-    // Si está completado, usamos el resultado
     switch (result?.toLowerCase()) {
       case 'victoria':
         return {
@@ -60,19 +57,18 @@ class FightTile extends StatelessWidget {
     final String formattedDate = formatter.format(fight.date);
 
     return GestureDetector(
-      onTap: onTap, // Hacemos que toda la tarjeta responda al toque
+      onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 8.0),
         padding: const EdgeInsets.all(12.0),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300),
+          border: Border.all(color: Colors.grey.withOpacity(0.2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Fila superior: Chip de estado/resultado y Fecha
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -101,23 +97,24 @@ class FightTile extends StatelessWidget {
                 ),
                 Text(
                   formattedDate,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
             ),
             const Divider(height: 20),
 
-            // Detalles del evento
             Text.rich(
               TextSpan(
-                style: TextStyle(color: Colors.grey.shade800, height: 1.5),
+                style: TextStyle(
+                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  height: 1.5,
+                ),
                 children: [
                   const TextSpan(
                     text: 'Lugar: ',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   TextSpan(text: '${fight.location}\n'),
-                  // Solo muestra el oponente si la pelea está completada
                   if (fight.status == 'Completado')
                     TextSpan(
                       children: [
@@ -125,39 +122,44 @@ class FightTile extends StatelessWidget {
                           text: 'Oponente: ',
                           style: TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        TextSpan(text: fight.opponent ?? 'No registrado'),
+                        TextSpan(text: fight.opponent ?? 'N/A'),
                       ],
                     ),
                 ],
               ),
             ),
 
-            // Muestra las notas correspondientes según el estado
-            if (fight.status == 'Programado' &&
-                fight.preparationNotes != null &&
-                fight.preparationNotes!.isNotEmpty)
+            // --- MOSTRAR DURACIÓN SI EXISTE ---
+            if (fight.fightDuration != null && fight.fightDuration!.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(top: 8.0),
+                padding: const EdgeInsets.only(top: 4.0),
                 child: Text(
-                  'Notas Prep: ${fight.preparationNotes}',
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
+                  'Duración: ${fight.fightDuration}',
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
 
-            if (fight.status == 'Completado' &&
-                fight.postFightNotes != null &&
-                fight.postFightNotes!.isNotEmpty)
+            if (fight.status == 'Completado' && fight.survived != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
-                child: Text(
-                  'Notas Post: ${fight.postFightNotes}',
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
+                child: Row(
+                  children: [
+                    Icon(
+                      fight.survived!
+                          ? Icons.check_circle_outline
+                          : Icons.cancel_outlined,
+                      color: fight.survived! ? Colors.green : Colors.red,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      fight.survived! ? 'Sobrevivió' : 'No Sobrevivió',
+                      style: TextStyle(
+                        color: fight.survived! ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
           ],

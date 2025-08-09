@@ -12,6 +12,7 @@ import 'package:roozterfaceapp/models/user_model.dart';
 import 'package:roozterfaceapp/screens/add_fight_screen.dart';
 import 'package:roozterfaceapp/screens/add_health_log_screen.dart';
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
+import 'package:roozterfaceapp/screens/fight_details_screen.dart'; // Importamos detalles de pelea
 import 'package:roozterfaceapp/screens/health_log_details_screen.dart';
 import 'package:roozterfaceapp/services/fight_service.dart';
 import 'package:roozterfaceapp/services/health_service.dart';
@@ -61,13 +62,13 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     );
   }
 
-  void _goToEditFightScreen(FightModel fight) {
+  // NAVEGACIÓN A DETALLES DE PELEA (NUEVO FLUJO)
+  void _goToFightDetails(FightModel fight) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) =>
-            AddFightScreen(roosterId: widget.rooster.id, fightToEdit: fight),
-        fullscreenDialog: true,
+            FightDetailsScreen(roosterId: widget.rooster.id, fight: fight),
       ),
     );
   }
@@ -120,9 +121,8 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
       body: StreamBuilder<DocumentSnapshot>(
         stream: _roosterService.getUserProfileStream(),
         builder: (context, userSnapshot) {
-          if (!userSnapshot.hasData) {
+          if (!userSnapshot.hasData)
             return const Center(child: CircularProgressIndicator());
-          }
           final userProfile = UserModel.fromFirestore(userSnapshot.data!);
           final bool isMaestroOrHigher = userProfile.plan != 'iniciacion';
           final int tabCount = isMaestroOrHigher ? 3 : 1;
@@ -137,8 +137,12 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                   expandedHeight: 250.0,
                   floating: false,
                   pinned: true,
-                  backgroundColor: Colors.grey[900],
-                  foregroundColor: Colors.white,
+                  backgroundColor: Theme.of(
+                    context,
+                  ).appBarTheme.backgroundColor,
+                  foregroundColor: Theme.of(
+                    context,
+                  ).appBarTheme.foregroundColor,
                   actions: [
                     IconButton(
                       icon: const Icon(Icons.edit),
@@ -173,9 +177,6 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                   ),
                   bottom: TabBar(
                     controller: _tabController,
-                    indicatorColor: Colors.white,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: Colors.grey[400],
                     tabs: [
                       const Tab(
                         icon: Icon(Icons.info_outline),
@@ -210,7 +211,6 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     );
   }
 
-  // --- ¡PESTAÑA GENERAL ACTUALIZADA! ---
   Widget _buildGeneralInfoTab() {
     final DateFormat formatter = DateFormat('dd de MMMM de yyyy', 'es_ES');
     final String formattedBirthDate = formatter.format(
@@ -224,13 +224,11 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
         widget.rooster.motherName ??
         widget.rooster.motherLineageText ??
         'No registrada';
-
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // --- Sección de Datos Básicos ---
           _buildDetailRow(
             icon: Icons.badge,
             label: 'Placa',
@@ -251,8 +249,6 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
             value: widget.rooster.status,
           ),
           const Divider(),
-
-          // --- Sección de Características Físicas ---
           const SizedBox(height: 16),
           Text(
             "Características",
@@ -283,8 +279,6 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
             value: widget.rooster.legColor ?? 'No registrado',
           ),
           const Divider(),
-
-          // --- Sección de Linaje (Ahora separada) ---
           const SizedBox(height: 16),
           Text("Linaje", style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
@@ -312,26 +306,21 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              icon: const Icon(Icons.add_circle, color: Colors.black),
-              label: const Text(
-                "Programar Combate",
-                style: TextStyle(color: Colors.black),
-              ),
+              icon: const Icon(Icons.add_circle),
+              label: const Text("Programar Combate"),
               onPressed: _goToAddFightScreen,
             ),
           ),
           StreamBuilder<List<FightModel>>(
             stream: _fightService.getFightsStream(widget.rooster.id),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+              if (snapshot.connectionState == ConnectionState.waiting)
                 return const CircularProgressIndicator();
-              }
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              if (!snapshot.hasData || snapshot.data!.isEmpty)
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24.0),
                   child: Text("No hay eventos registrados."),
                 );
-              }
               final fights = snapshot.data!;
               return ListView.builder(
                 shrinkWrap: true,
@@ -339,45 +328,10 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                 itemCount: fights.length,
                 itemBuilder: (context, index) {
                   final fight = fights[index];
-                  return Dismissible(
-                    key: Key(fight.id),
-                    direction: DismissDirection.endToStart,
-                    background: Container(
-                      color: Colors.red,
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 20.0),
-                      child: const Icon(Icons.delete, color: Colors.white),
-                    ),
-                    confirmDismiss: (direction) async {
-                      bool? confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (c) => AlertDialog(
-                          title: const Text("Confirmar Borrado"),
-                          content: const Text(
-                            "¿Estás seguro de que quieres borrar este evento de combate?",
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.of(c).pop(false),
-                              child: const Text("Cancelar"),
-                            ),
-                            TextButton(
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.red,
-                              ),
-                              onPressed: () => Navigator.of(c).pop(true),
-                              child: const Text("Borrar"),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirm != true) return false;
-                      return await _deleteFight(fight);
-                    },
-                    child: FightTile(
-                      fight: fight,
-                      onTap: () => _goToEditFightScreen(fight),
-                    ),
+                  // El Dismissible ha sido eliminado de aquí, ya que el borrado ahora está en la pantalla de detalles
+                  return FightTile(
+                    fight: fight,
+                    onTap: () => _goToFightDetails(fight),
                   );
                 },
               );
@@ -396,26 +350,21 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
-              icon: const Icon(Icons.add_circle, color: Colors.black),
-              label: const Text(
-                "Añadir Registro",
-                style: TextStyle(color: Colors.black),
-              ),
+              icon: const Icon(Icons.add_circle),
+              label: const Text("Añadir Registro"),
               onPressed: _goToAddHealthLogScreen,
             ),
           ),
           StreamBuilder<List<HealthLogModel>>(
             stream: _healthService.getHealthLogsStream(widget.rooster.id),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
+              if (snapshot.connectionState == ConnectionState.waiting)
                 return const CircularProgressIndicator();
-              }
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              if (!snapshot.hasData || snapshot.data!.isEmpty)
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24.0),
                   child: Text("No hay registros de salud."),
                 );
-              }
               final logs = snapshot.data!;
               return ListView.builder(
                 shrinkWrap: true,

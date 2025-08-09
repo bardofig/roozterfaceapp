@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:roozterfaceapp/data/options_data.dart';
 import 'package:roozterfaceapp/models/fight_model.dart';
 import 'package:roozterfaceapp/services/fight_service.dart';
 
@@ -21,12 +22,16 @@ class _AddFightScreenState extends State<AddFightScreen> {
   final _opponentController = TextEditingController();
   final _prepNotesController = TextEditingController();
   final _postNotesController = TextEditingController();
+  final _injuriesController = TextEditingController();
 
   // Variables de estado
   DateTime? _selectedDate;
   String? _selectedResult;
   final List<String> _results = ['Victoria', 'Derrota', 'Tabla'];
   bool _survived = true;
+  String? _selectedWeaponType;
+  String? _selectedDuration;
+
   final FightService _fightService = FightService();
   bool _isSaving = false;
   bool get _isEditing => widget.fightToEdit != null;
@@ -41,11 +46,45 @@ class _AddFightScreenState extends State<AddFightScreen> {
       _prepNotesController.text = fight.preparationNotes ?? '';
       _postNotesController.text = fight.postFightNotes ?? '';
       _selectedDate = fight.date;
-      _selectedResult = fight.result;
       _survived = fight.survived ?? true;
+      _injuriesController.text = fight.injuriesSustained ?? '';
+
+      // --- ¡LÓGICA DE VALIDACIÓN CORREGIDA! ---
+      // Validamos cada valor antes de asignarlo.
+
+      // Validar Resultado
+      if (fight.result != null && _results.contains(fight.result)) {
+        _selectedResult = fight.result;
+      }
+
+      // Validar Arma
+      if (fight.weaponType != null &&
+          weaponTypeOptions.contains(fight.weaponType)) {
+        _selectedWeaponType = fight.weaponType;
+      }
+
+      // Validar Duración
+      if (fight.fightDuration != null &&
+          fightDurationOptions.contains(fight.fightDuration)) {
+        _selectedDuration = fight.fightDuration;
+      }
     } else {
+      // Valores por defecto al crear
       _selectedResult = 'Victoria';
+      _selectedWeaponType = weaponTypeOptions.isNotEmpty
+          ? weaponTypeOptions[0]
+          : null;
     }
+  }
+
+  @override
+  void dispose() {
+    _locationController.dispose();
+    _opponentController.dispose();
+    _prepNotesController.dispose();
+    _postNotesController.dispose();
+    _injuriesController.dispose();
+    super.dispose();
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -80,7 +119,6 @@ class _AddFightScreenState extends State<AddFightScreen> {
       );
       return;
     }
-
     setState(() {
       _isSaving = true;
     });
@@ -97,6 +135,9 @@ class _AddFightScreenState extends State<AddFightScreen> {
           result: _selectedResult,
           postFightNotes: _postNotesController.text,
           survived: _survived,
+          weaponType: _selectedWeaponType,
+          fightDuration: _selectedDuration,
+          injuriesSustained: _injuriesController.text,
         );
       } else {
         await _fightService.addFight(
@@ -111,6 +152,9 @@ class _AddFightScreenState extends State<AddFightScreen> {
           const SnackBar(content: Text('Evento de combate guardado.')),
         );
         Navigator.of(context).pop();
+        if (_isEditing) {
+          Navigator.of(context).pop();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -140,7 +184,6 @@ class _AddFightScreenState extends State<AddFightScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Campos comunes
             Row(
               children: [
                 Expanded(
@@ -173,7 +216,6 @@ class _AddFightScreenState extends State<AddFightScreen> {
               textCapitalization: TextCapitalization.sentences,
             ),
 
-            // Campos solo para modo edición
             if (_isEditing)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,6 +250,57 @@ class _AddFightScreenState extends State<AddFightScreen> {
                         _selectedResult = newValue;
                       });
                     },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: _selectedWeaponType,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Arma Utilizada',
+                    ),
+                    items: weaponTypeOptions
+                        .map(
+                          (String weapon) => DropdownMenuItem<String>(
+                            value: weapon,
+                            child: Text(weapon),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (newValue) {
+                      setState(() {
+                        _selectedWeaponType = newValue;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  DropdownButtonFormField<String>(
+                    value: _selectedDuration,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Duración de la Pelea',
+                    ),
+                    items: fightDurationOptions
+                        .map(
+                          (String duration) => DropdownMenuItem<String>(
+                            value: duration,
+                            child: Text(duration),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (newValue) {
+                      setState(() {
+                        _selectedDuration = newValue;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _injuriesController,
+                    decoration: const InputDecoration(
+                      labelText: 'Heridas Sufridas',
+                    ),
+                    maxLines: 2,
+                    textCapitalization: TextCapitalization.sentences,
                   ),
                   const SizedBox(height: 16),
                   TextField(

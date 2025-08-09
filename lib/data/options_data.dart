@@ -1,23 +1,19 @@
 // lib/data/options_data.dart
 
-// --- Lista de Tipos de Cresta ---
-// Basada en el archivo crestascoloresgallos.txt
 const List<String> combTypeOptions = [
-  'Simple', // Común, Minorca, Peruvian Navaja, Tuzo
-  'Rosa', // Minorca, Peruvian Navaja
-  'Triple (Guisante)', // Peruvian Navaja, Asil, Pava en Albanys/Butcher
-  'Cereza', // Malayo
-  'De Cinco Puntas', // American Gamefowl / Roundhead
-  'Pava', // Albanys, Butcher/Albany crosses
-  'Sierra', // Clarets, a veces en Albanys
+  'Simple',
+  'Rosa',
+  'Triple (Guisante)',
+  'Cereza',
+  'De Cinco Puntas',
+  'Pava',
+  'Sierra',
   'Doble (Abosado)',
-  'Penacho (Tassel)', // Old English Game
-  'Con Barba (Muffed)', // Old English Game
+  'Penacho (Tassel)',
+  'Con Barba (Muffed)',
   'Otra',
 ];
 
-// --- Lista de Colores de Plumaje Comunes ---
-// Basada en el archivo crestascoloresgallos.txt
 const List<String> plumageColorOptions = [
   'Colorado',
   'Colorado Pecho Negro (Black-breasted red)',
@@ -42,8 +38,6 @@ const List<String> plumageColorOptions = [
   'Otro',
 ];
 
-// --- Lista de Colores de Patas Comunes ---
-// Basada en el archivo crestascoloresgallos.txt
 const List<String> legColorOptions = [
   'Amarilla',
   'Blanca',
@@ -54,3 +48,19 @@ const List<String> legColorOptions = [
   'Rosada',
   'Otra',
 ];
+
+const List<String> weaponTypeOptions = [
+  'Navaja de 1 pulgada',
+  'Navaja de 1 pulgada, 2 líneas',
+  'Espuela Natural',
+  'Espuela de Plástico',
+  'Pico y Espuela (sin arma)',
+  'Otra',
+];
+
+// --- ¡NUEVA LISTA DE DURACIÓN DE PELEA! ---
+// Generamos una lista de "1 minuto", "2 minutos", etc., hasta 20.
+final List<String> fightDurationOptions = List.generate(
+  20,
+  (index) => '${index + 1} minuto${index == 0 ? '' : 's'}',
+);
