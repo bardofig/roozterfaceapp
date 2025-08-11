@@ -2,15 +2,18 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:roozterfaceapp/data/options_data.dart';
 import 'package:roozterfaceapp/models/health_log_model.dart';
 import 'package:roozterfaceapp/services/health_service.dart';
 
 class AddHealthLogScreen extends StatefulWidget {
+  final String galleraId;
   final String roosterId;
-  final HealthLogModel? logToEdit; // Parámetro opcional para modo edición
+  final HealthLogModel? logToEdit;
 
   const AddHealthLogScreen({
     super.key,
+    required this.galleraId,
     required this.roosterId,
     this.logToEdit,
   });
@@ -20,13 +23,11 @@ class AddHealthLogScreen extends StatefulWidget {
 }
 
 class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
-  // Controladores
   final _productNameController = TextEditingController();
   final _conditionController = TextEditingController();
   final _dosageController = TextEditingController();
   final _notesController = TextEditingController();
 
-  // Variables de estado
   DateTime? _selectedDate;
   String? _selectedLogCategory;
   final List<String> _logCategories = [
@@ -61,33 +62,35 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
   @override
   void initState() {
     super.initState();
-    // --- LÓGICA DE INICIALIZACIÓN CORREGIDA ---
     if (_isEditing) {
-      // Si estamos editando, llenamos los campos con los datos del registro existente
       final log = widget.logToEdit!;
       _productNameController.text = log.productName;
       _dosageController.text = log.dosage ?? '';
       _notesController.text = log.notes;
       _selectedDate = log.date;
       _selectedLogCategory = log.logCategory;
-
-      // Lógica para manejar la enfermedad/condición
       if (log.illnessOrCondition != null &&
           log.illnessOrCondition!.isNotEmpty) {
-        // Comprobamos si la condición guardada está en nuestra lista de enfermedades comunes
         if (_commonIllnesses.contains(log.illnessOrCondition)) {
           _selectedIllness = log.illnessOrCondition;
         } else {
-          // Si no está en la lista, significa que fue una entrada manual
           _selectedIllness = 'Otra...';
           _conditionController.text = log.illnessOrCondition!;
         }
       }
     } else {
-      // Valores por defecto al crear un nuevo registro
       _selectedLogCategory = 'Vacunación';
       _selectedDate = DateTime.now();
     }
+  }
+
+  @override
+  void dispose() {
+    _productNameController.dispose();
+    _conditionController.dispose();
+    _dosageController.dispose();
+    _notesController.dispose();
+    super.dispose();
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -138,6 +141,7 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
     try {
       if (_isEditing) {
         await _healthService.updateHealthLog(
+          galleraId: widget.galleraId,
           roosterId: widget.roosterId,
           logId: widget.logToEdit!.id,
           date: _selectedDate!,
@@ -149,6 +153,7 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
         );
       } else {
         await _healthService.addHealthLog(
+          galleraId: widget.galleraId,
           roosterId: widget.roosterId,
           date: _selectedDate!,
           logCategory: _selectedLogCategory!,
@@ -162,9 +167,9 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Registro de salud guardado.')),
         );
-        Navigator.of(context).pop(); // Cierra el formulario de edición
+        Navigator.of(context).pop();
         if (_isEditing) {
-          Navigator.of(context).pop(); // Cierra también la pantalla de detalles
+          Navigator.of(context).pop();
         }
       }
     } catch (e) {

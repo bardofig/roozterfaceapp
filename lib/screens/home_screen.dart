@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
 import 'package:roozterfaceapp/models/user_model.dart';
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
+import 'package:roozterfaceapp/screens/gallera_management_screen.dart';
+import 'package:roozterfaceapp/screens/gallera_switcher_screen.dart';
 import 'package:roozterfaceapp/screens/profile_screen.dart';
 import 'package:roozterfaceapp/screens/rooster_details_screen.dart';
 import 'package:roozterfaceapp/screens/subscription_screen.dart';
@@ -29,22 +31,27 @@ class _HomeScreenState extends State<HomeScreen> {
     _authService.signOut();
   }
 
-  void addRooster(String currentUserPlan) {
+  void addRooster(String currentUserPlan, String activeGalleraId) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            AddRoosterScreen(currentUserPlan: currentUserPlan),
+        builder: (context) => AddRoosterScreen(
+          currentUserPlan: currentUserPlan,
+          activeGalleraId: activeGalleraId,
+        ),
         fullscreenDialog: true,
       ),
     );
   }
 
-  void goToRoosterDetails(RoosterModel rooster) {
+  void goToRoosterDetails(RoosterModel rooster, String activeGalleraId) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => RoosterDetailsScreen(rooster: rooster),
+        builder: (context) => RoosterDetailsScreen(
+          rooster: rooster,
+          activeGalleraId: activeGalleraId,
+        ),
       ),
     );
   }
@@ -81,9 +88,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<bool> _deleteRooster(RoosterModel rooster) async {
+  Future<bool> _deleteRooster(
+    RoosterModel rooster,
+    String activeGalleraId,
+  ) async {
     try {
-      await _roosterService.deleteRooster(rooster);
+      await _roosterService.deleteRooster(
+        galleraId: activeGalleraId,
+        rooster: rooster,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('"${rooster.name}" ha sido borrado.')),
@@ -103,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: StreamBuilder<DocumentSnapshot>(
+      body: StreamBuilder<DocumentSnapshot?>(
         stream: _roosterService.getUserProfileStream(),
         builder: (context, userSnapshot) {
           if (userSnapshot.connectionState == ConnectionState.waiting) {
@@ -111,53 +124,78 @@ class _HomeScreenState extends State<HomeScreen> {
               body: Center(child: CircularProgressIndicator()),
             );
           }
-          if (!userSnapshot.hasData) {
+          if (!userSnapshot.hasData ||
+              userSnapshot.data == null ||
+              !userSnapshot.data!.exists) {
             return const Scaffold(
-              body: Center(
-                child: Text("No se pudo cargar el perfil del usuario."),
-              ),
+              body: Center(child: CircularProgressIndicator()),
             );
           }
 
           final userProfile = UserModel.fromFirestore(userSnapshot.data!);
+          final String? activeGalleraId = userProfile.activeGalleraId;
           final isPlanIniciacion = userProfile.plan == 'iniciacion';
+          final bool isEliteUser = userProfile.plan == 'elite';
 
-          return StreamBuilder<List<RoosterModel>>(
-            stream: _roosterService.getRoostersStream(),
-            builder: (context, roosterSnapshot) {
-              if (roosterSnapshot.connectionState == ConnectionState.waiting) {
-                return Scaffold(
-                  appBar: AppBar(title: const Text('Mis Gallos')),
-                  drawer: _buildDrawer(
-                    userProfile,
-                  ), // Muestra el drawer mientras carga la lista
-                  body: const Center(child: CircularProgressIndicator()),
-                );
-              }
-              if (roosterSnapshot.hasError) {
-                return Scaffold(
-                  appBar: AppBar(title: const Text('Mis Gallos')),
-                  drawer: _buildDrawer(userProfile),
-                  body: Center(child: Text("Error: ${roosterSnapshot.error}")),
-                );
-              }
-
-              final roosters = roosterSnapshot.data ?? [];
-              final int roosterCount = roosters.length;
-              final bool canAddRooster = !isPlanIniciacion || roosterCount < 15;
-
-              return Scaffold(
-                appBar: AppBar(title: const Text('Mis Gallos')),
-                drawer: _buildDrawer(userProfile),
-                body: roosters.isEmpty
-                    ? const Center(
-                        child: Text(
-                          "No tienes gallos registrados.\n¡Añade el primero!",
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 18, color: Colors.grey),
+          return Scaffold(
+            appBar: AppBar(title: const Text('Mis Gallos')),
+            drawer: _buildDrawer(userProfile, isEliteUser),
+            // El FAB ahora está aquí, fuera del StreamBuilder de gallos
+            floatingActionButton: activeGalleraId != null
+                ? StreamBuilder<List<RoosterModel>>(
+                    stream: _roosterService.getRoostersStream(activeGalleraId),
+                    builder: (context, roosterSnapshot) {
+                      final roosterCount = roosterSnapshot.data?.length ?? 0;
+                      final canAddRooster =
+                          !isPlanIniciacion || roosterCount < 15;
+                      return FloatingActionButton(
+                        onPressed: () {
+                          if (canAddRooster) {
+                            addRooster(userProfile.plan, activeGalleraId);
+                          } else {
+                            _showLimitDialog();
+                          }
+                        },
+                        backgroundColor: canAddRooster
+                            ? Theme.of(context).colorScheme.primary
+                            : Colors.grey,
+                        child: Icon(
+                          Icons.add,
+                          color: Theme.of(context).colorScheme.onPrimary,
                         ),
-                      )
-                    : ListView.builder(
+                      );
+                    },
+                  )
+                : null,
+            body: activeGalleraId == null || activeGalleraId.isEmpty
+                ? const Center(child: Text("No tienes una gallera asignada."))
+                : StreamBuilder<List<RoosterModel>>(
+                    stream: _roosterService.getRoostersStream(activeGalleraId),
+                    builder: (context, roosterSnapshot) {
+                      if (roosterSnapshot.hasError) {
+                        return Center(
+                          child: Text(
+                            "Error al cargar gallos: ${roosterSnapshot.error}",
+                          ),
+                        );
+                      }
+                      if (!roosterSnapshot.hasData) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+
+                      final roosters = roosterSnapshot.data!;
+
+                      if (roosters.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            "No tienes gallos registrados.\n¡Añade el primero!",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 18, color: Colors.grey),
+                          ),
+                        );
+                      }
+
+                      return ListView.builder(
                         itemCount: roosters.length,
                         itemBuilder: (context, index) {
                           final rooster = roosters[index];
@@ -201,44 +239,31 @@ class _HomeScreenState extends State<HomeScreen> {
                                 },
                               );
                               if (confirm != true) return false;
-                              return await _deleteRooster(rooster);
+                              return await _deleteRooster(
+                                rooster,
+                                activeGalleraId,
+                              );
                             },
                             child: RoosterTile(
                               name: rooster.name,
                               plate: rooster.plate,
                               status: rooster.status,
                               imageUrl: rooster.imageUrl,
-                              onTap: () => goToRoosterDetails(rooster),
+                              onTap: () =>
+                                  goToRoosterDetails(rooster, activeGalleraId),
                             ),
                           );
                         },
-                      ),
-                floatingActionButton: FloatingActionButton(
-                  onPressed: () {
-                    if (canAddRooster) {
-                      addRooster(userProfile.plan);
-                    } else {
-                      _showLimitDialog();
-                    }
-                  },
-                  backgroundColor: canAddRooster
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.grey,
-                  child: Icon(
-                    Icons.add,
-                    color: Theme.of(context).colorScheme.onPrimary,
+                      );
+                    },
                   ),
-                ),
-              );
-            },
           );
         },
       ),
     );
   }
 
-  // He movido la lógica del Drawer a su propio método para mayor limpieza
-  Widget _buildDrawer(UserModel userProfile) {
+  Widget _buildDrawer(UserModel userProfile, bool isEliteUser) {
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -302,6 +327,19 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           ListTile(
+            leading: const Icon(Icons.swap_horiz),
+            title: const Text('Cambiar Gallera'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const GalleraSwitcherScreen(),
+                ),
+              );
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.account_circle_outlined),
             title: const Text('Mi Perfil'),
             onTap: () {
@@ -312,6 +350,20 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
+          if (isEliteUser)
+            ListTile(
+              leading: const Icon(Icons.groups_outlined),
+              title: const Text('Gestionar Gallera'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => GalleraManagementScreen(),
+                  ),
+                );
+              },
+            ),
           ListTile(
             leading: const Icon(Icons.workspace_premium_outlined),
             title: const Text('Planes y Suscripción'),

@@ -7,31 +7,35 @@ import 'package:roozterfaceapp/models/fight_model.dart';
 import 'package:roozterfaceapp/services/fight_service.dart';
 
 class AddFightScreen extends StatefulWidget {
+  final String galleraId;
   final String roosterId;
   final FightModel? fightToEdit;
 
-  const AddFightScreen({super.key, required this.roosterId, this.fightToEdit});
+  const AddFightScreen({
+    super.key,
+    required this.galleraId,
+    required this.roosterId,
+    this.fightToEdit,
+  });
 
   @override
   State<AddFightScreen> createState() => _AddFightScreenState();
 }
 
 class _AddFightScreenState extends State<AddFightScreen> {
-  // Controladores
   final _locationController = TextEditingController();
   final _opponentController = TextEditingController();
   final _prepNotesController = TextEditingController();
   final _postNotesController = TextEditingController();
+  final _weaponController = TextEditingController();
+  final _durationController = TextEditingController();
   final _injuriesController = TextEditingController();
-
-  // Variables de estado
   DateTime? _selectedDate;
   String? _selectedResult;
   final List<String> _results = ['Victoria', 'Derrota', 'Tabla'];
   bool _survived = true;
   String? _selectedWeaponType;
   String? _selectedDuration;
-
   final FightService _fightService = FightService();
   bool _isSaving = false;
   bool get _isEditing => widget.fightToEdit != null;
@@ -46,34 +50,14 @@ class _AddFightScreenState extends State<AddFightScreen> {
       _prepNotesController.text = fight.preparationNotes ?? '';
       _postNotesController.text = fight.postFightNotes ?? '';
       _selectedDate = fight.date;
+      _selectedResult = fight.result;
       _survived = fight.survived ?? true;
+      _selectedWeaponType = fight.weaponType;
+      _selectedDuration = fight.fightDuration;
       _injuriesController.text = fight.injuriesSustained ?? '';
-
-      // --- ¡LÓGICA DE VALIDACIÓN CORREGIDA! ---
-      // Validamos cada valor antes de asignarlo.
-
-      // Validar Resultado
-      if (fight.result != null && _results.contains(fight.result)) {
-        _selectedResult = fight.result;
-      }
-
-      // Validar Arma
-      if (fight.weaponType != null &&
-          weaponTypeOptions.contains(fight.weaponType)) {
-        _selectedWeaponType = fight.weaponType;
-      }
-
-      // Validar Duración
-      if (fight.fightDuration != null &&
-          fightDurationOptions.contains(fight.fightDuration)) {
-        _selectedDuration = fight.fightDuration;
-      }
     } else {
-      // Valores por defecto al crear
       _selectedResult = 'Victoria';
-      _selectedWeaponType = weaponTypeOptions.isNotEmpty
-          ? weaponTypeOptions[0]
-          : null;
+      _selectedWeaponType = weaponTypeOptions[0];
     }
   }
 
@@ -83,6 +67,7 @@ class _AddFightScreenState extends State<AddFightScreen> {
     _opponentController.dispose();
     _prepNotesController.dispose();
     _postNotesController.dispose();
+    _weaponController.dispose();
     _injuriesController.dispose();
     super.dispose();
   }
@@ -126,6 +111,7 @@ class _AddFightScreenState extends State<AddFightScreen> {
     try {
       if (_isEditing) {
         await _fightService.updateFight(
+          galleraId: widget.galleraId,
           roosterId: widget.roosterId,
           fightId: widget.fightToEdit!.id,
           date: _selectedDate!,
@@ -141,6 +127,7 @@ class _AddFightScreenState extends State<AddFightScreen> {
         );
       } else {
         await _fightService.addFight(
+          galleraId: widget.galleraId,
           roosterId: widget.roosterId,
           date: _selectedDate!,
           location: _locationController.text,
@@ -215,7 +202,6 @@ class _AddFightScreenState extends State<AddFightScreen> {
               maxLines: 3,
               textCapitalization: TextCapitalization.sentences,
             ),
-
             if (_isEditing)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,7 +315,6 @@ class _AddFightScreenState extends State<AddFightScreen> {
                   ),
                 ],
               ),
-
             const SizedBox(height: 32),
             SizedBox(
               width: double.infinity,

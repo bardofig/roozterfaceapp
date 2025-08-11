@@ -29,7 +29,7 @@ class FightService {
         .doc(roosterId);
   }
 
-  Stream<List<FightModel>> getFightsStream(String roosterId) {
+  Stream<List<FightModel>> getFightsStream(String roosterId, String id) {
     return _fightsCollection(
       roosterId,
     ).orderBy('date', descending: true).snapshots().map((snapshot) {
@@ -42,6 +42,7 @@ class FightService {
     required DateTime date,
     required String location,
     String? preparationNotes,
+    required String galleraId,
   }) async {
     try {
       Map<String, dynamic> fightData = {
@@ -78,6 +79,7 @@ class FightService {
     String? weaponType,
     String? fightDuration,
     String? injuriesSustained,
+    required String galleraId,
   }) async {
     try {
       await _firestore.runTransaction((transaction) async {
@@ -126,6 +128,7 @@ class FightService {
   Future<void> deleteFight({
     required String roosterId,
     required String fightId,
+    required String galleraId,
   }) async {
     try {
       await _fightsCollection(roosterId).doc(fightId).delete();

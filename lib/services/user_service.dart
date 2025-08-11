@@ -9,7 +9,20 @@ class UserService {
 
   String? get currentUserId => _auth.currentUser?.uid;
 
-  // Actualiza los datos del perfil del usuario en Firestore
+  // Actualiza el ID de la gallera activa en el perfil del usuario.
+  // Esto controla qué gallera ve el usuario en la HomeScreen.
+  Future<void> setActiveGallera(String galleraId) async {
+    if (currentUserId == null) {
+      throw Exception(
+        "Usuario no autenticado. No se puede cambiar de gallera.",
+      );
+    }
+    await _firestore.collection('users').doc(currentUserId).update({
+      'activeGalleraId': galleraId,
+    });
+  }
+
+  // Actualiza los datos del perfil del usuario (nombre, dirección, etc.)
   Future<void> updateUserProfile({
     required String fullName,
     required String mobilePhone,
@@ -22,11 +35,12 @@ class UserService {
     required String country,
   }) async {
     if (currentUserId == null) {
-      throw Exception("Usuario no autenticado.");
+      throw Exception(
+        "Usuario no autenticado. No se pueden guardar los cambios del perfil.",
+      );
     }
 
     try {
-      // Preparamos el mapa con los datos a actualizar
       Map<String, dynamic> updatedData = {
         'fullName': fullName,
         'mobilePhone': mobilePhone,
@@ -39,7 +53,6 @@ class UserService {
         'country': country,
       };
 
-      // Apuntamos al documento del usuario y actualizamos los campos
       await _firestore
           .collection('users')
           .doc(currentUserId)

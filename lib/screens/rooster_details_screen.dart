@@ -2,6 +2,7 @@
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -12,8 +13,10 @@ import 'package:roozterfaceapp/models/user_model.dart';
 import 'package:roozterfaceapp/screens/add_fight_screen.dart';
 import 'package:roozterfaceapp/screens/add_health_log_screen.dart';
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
-import 'package:roozterfaceapp/screens/fight_details_screen.dart'; // Importamos detalles de pelea
+import 'package:roozterfaceapp/screens/fight_details_screen.dart';
 import 'package:roozterfaceapp/screens/health_log_details_screen.dart';
+import 'package:roozterfaceapp/screens/pedigree_screen.dart';
+import 'package:roozterfaceapp/services/analytics_service.dart';
 import 'package:roozterfaceapp/services/fight_service.dart';
 import 'package:roozterfaceapp/services/health_service.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';
@@ -22,7 +25,14 @@ import 'package:roozterfaceapp/widgets/health_log_tile.dart';
 
 class RoosterDetailsScreen extends StatefulWidget {
   final RoosterModel rooster;
-  const RoosterDetailsScreen({super.key, required this.rooster});
+  final String activeGalleraId;
+
+  const RoosterDetailsScreen({
+    super.key,
+    required this.rooster,
+    required this.activeGalleraId,
+  });
+
   @override
   State<RoosterDetailsScreen> createState() => _RoosterDetailsScreenState();
 }
@@ -33,6 +43,7 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
   final RoosterService _roosterService = RoosterService();
   final FightService _fightService = FightService();
   final HealthService _healthService = HealthService();
+  final AnalyticsService _analyticsService = AnalyticsService();
 
   @override
   void dispose() {
@@ -47,6 +58,7 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
         builder: (context) => AddRoosterScreen(
           roosterToEdit: widget.rooster,
           currentUserPlan: currentUserPlan,
+          activeGalleraId: widget.activeGalleraId,
         ),
       ),
     );
@@ -56,19 +68,24 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddFightScreen(roosterId: widget.rooster.id),
+        builder: (context) => AddFightScreen(
+          galleraId: widget.activeGalleraId,
+          roosterId: widget.rooster.id,
+        ),
         fullscreenDialog: true,
       ),
     );
   }
 
-  // NAVEGACIÓN A DETALLES DE PELEA (NUEVO FLUJO)
   void _goToFightDetails(FightModel fight) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            FightDetailsScreen(roosterId: widget.rooster.id, fight: fight),
+        builder: (context) => FightDetailsScreen(
+          galleraId: widget.activeGalleraId,
+          roosterId: widget.rooster.id,
+          fight: fight,
+        ),
       ),
     );
   }
@@ -77,7 +94,10 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AddHealthLogScreen(roosterId: widget.rooster.id),
+        builder: (context) => AddHealthLogScreen(
+          galleraId: widget.activeGalleraId,
+          roosterId: widget.rooster.id,
+        ),
         fullscreenDialog: true,
       ),
     );
@@ -87,8 +107,23 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            HealthLogDetailsScreen(roosterId: widget.rooster.id, log: log),
+        builder: (context) => HealthLogDetailsScreen(
+          galleraId: widget.activeGalleraId,
+          roosterId: widget.rooster.id,
+          log: log,
+        ),
+      ),
+    );
+  }
+
+  void _goToPedigreeScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PedigreeScreen(
+          initialRooster: widget.rooster,
+          galleraId: widget.activeGalleraId,
+        ),
       ),
     );
   }
@@ -96,6 +131,7 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
   Future<bool> _deleteFight(FightModel fight) async {
     try {
       await _fightService.deleteFight(
+        galleraId: widget.activeGalleraId,
         roosterId: widget.rooster.id,
         fightId: fight.id,
       );
@@ -121,11 +157,18 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
       body: StreamBuilder<DocumentSnapshot>(
         stream: _roosterService.getUserProfileStream(),
         builder: (context, userSnapshot) {
-          if (!userSnapshot.hasData)
+          if (!userSnapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
+          }
           final userProfile = UserModel.fromFirestore(userSnapshot.data!);
-          final bool isMaestroOrHigher = userProfile.plan != 'iniciacion';
-          final int tabCount = isMaestroOrHigher ? 3 : 1;
+          final bool isMaestroOrHigher =
+              userProfile.plan == 'maestro' || userProfile.plan == 'elite';
+          final bool isEliteUser = userProfile.plan == 'elite';
+
+          int tabCount = 1;
+          if (isMaestroOrHigher) tabCount = 3;
+          if (isEliteUser) tabCount = 4;
+
           if (_tabController == null || _tabController!.length != tabCount) {
             _tabController?.dispose();
             _tabController = TabController(length: tabCount, vsync: this);
@@ -153,7 +196,11 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                     centerTitle: true,
                     title: Text(
                       widget.rooster.name,
-                      style: const TextStyle(fontSize: 16.0),
+                      style: const TextStyle(
+                        fontSize: 16.0,
+                        color: Colors.white,
+                        shadows: [Shadow(blurRadius: 4, color: Colors.black)],
+                      ),
                     ),
                     background: widget.rooster.imageUrl.isNotEmpty
                         ? CachedNetworkImage(
@@ -175,24 +222,21 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                             ),
                           ),
                   ),
-                  bottom: TabBar(
-                    controller: _tabController,
-                    tabs: [
-                      const Tab(
-                        icon: Icon(Icons.info_outline),
-                        text: 'General',
+                  bottom: PreferredSize(
+                    preferredSize: const Size.fromHeight(kToolbarHeight),
+                    child: Container(
+                      color: Theme.of(context).appBarTheme.backgroundColor,
+                      child: TabBar(
+                        controller: _tabController,
+                        isScrollable: tabCount > 3,
+                        tabs: [
+                          const Tab(text: 'General'),
+                          if (isMaestroOrHigher) const Tab(text: 'Combates'),
+                          if (isMaestroOrHigher) const Tab(text: 'Salud'),
+                          if (isEliteUser) const Tab(text: 'Analítica'),
+                        ],
                       ),
-                      if (isMaestroOrHigher)
-                        const Tab(
-                          icon: Icon(Icons.sports_kabaddi),
-                          text: 'Combates',
-                        ),
-                      if (isMaestroOrHigher)
-                        const Tab(
-                          icon: Icon(Icons.health_and_safety),
-                          text: 'Salud',
-                        ),
-                    ],
+                    ),
                   ),
                 ),
               ];
@@ -200,9 +244,10 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
             body: TabBarView(
               controller: _tabController,
               children: [
-                _buildGeneralInfoTab(),
+                _buildGeneralInfoTab(isEliteUser),
                 if (isMaestroOrHigher) _buildFightsTab(),
                 if (isMaestroOrHigher) _buildHealthTab(),
+                if (isEliteUser) _buildAnalyticsTab(),
               ],
             ),
           );
@@ -211,7 +256,7 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     );
   }
 
-  Widget _buildGeneralInfoTab() {
+  Widget _buildGeneralInfoTab(bool isEliteUser) {
     final DateFormat formatter = DateFormat('dd de MMMM de yyyy', 'es_ES');
     final String formattedBirthDate = formatter.format(
       widget.rooster.birthDate.toDate(),
@@ -224,6 +269,7 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
         widget.rooster.motherName ??
         widget.rooster.motherLineageText ??
         'No registrada';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
@@ -280,7 +326,18 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
           ),
           const Divider(),
           const SizedBox(height: 16),
-          Text("Linaje", style: Theme.of(context).textTheme.titleLarge),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("Linaje", style: Theme.of(context).textTheme.titleLarge),
+              if (isEliteUser)
+                TextButton.icon(
+                  icon: const Icon(Icons.account_tree),
+                  label: const Text("Ver Árbol"),
+                  onPressed: _goToPedigreeScreen,
+                ),
+            ],
+          ),
           const SizedBox(height: 8),
           _buildDetailRow(
             icon: Icons.male,
@@ -312,15 +369,20 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
             ),
           ),
           StreamBuilder<List<FightModel>>(
-            stream: _fightService.getFightsStream(widget.rooster.id),
+            stream: _fightService.getFightsStream(
+              widget.activeGalleraId,
+              widget.rooster.id,
+            ),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const CircularProgressIndicator();
-              if (!snapshot.hasData || snapshot.data!.isEmpty)
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24.0),
                   child: Text("No hay eventos registrados."),
                 );
+              }
               final fights = snapshot.data!;
               return ListView.builder(
                 shrinkWrap: true,
@@ -328,10 +390,45 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                 itemCount: fights.length,
                 itemBuilder: (context, index) {
                   final fight = fights[index];
-                  // El Dismissible ha sido eliminado de aquí, ya que el borrado ahora está en la pantalla de detalles
-                  return FightTile(
-                    fight: fight,
-                    onTap: () => _goToFightDetails(fight),
+                  return Dismissible(
+                    key: Key(fight.id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      color: Colors.red,
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20.0),
+                      child: const Icon(Icons.delete, color: Colors.white),
+                    ),
+                    confirmDismiss: (direction) async {
+                      bool? confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (c) => AlertDialog(
+                          title: const Text("Confirmar Borrado"),
+                          content: const Text(
+                            "¿Estás seguro de que quieres borrar este evento de combate?",
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(c).pop(false),
+                              child: const Text("Cancelar"),
+                            ),
+                            TextButton(
+                              style: TextButton.styleFrom(
+                                foregroundColor: Colors.red,
+                              ),
+                              onPressed: () => Navigator.of(c).pop(true),
+                              child: const Text("Borrar"),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm != true) return false;
+                      return await _deleteFight(fight);
+                    },
+                    child: FightTile(
+                      fight: fight,
+                      onTap: () => _goToFightDetails(fight),
+                    ),
                   );
                 },
               );
@@ -356,15 +453,20 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
             ),
           ),
           StreamBuilder<List<HealthLogModel>>(
-            stream: _healthService.getHealthLogsStream(widget.rooster.id),
+            stream: _healthService.getHealthLogsStream(
+              widget.activeGalleraId,
+              widget.rooster.id,
+            ),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const CircularProgressIndicator();
-              if (!snapshot.hasData || snapshot.data!.isEmpty)
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 24.0),
                   child: Text("No hay registros de salud."),
                 );
+              }
               final logs = snapshot.data!;
               return ListView.builder(
                 shrinkWrap: true,
@@ -379,6 +481,126 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                 },
               );
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAnalyticsTab() {
+    return StreamBuilder<List<FightModel>>(
+      stream: _fightService.getFightsStream(
+        widget.activeGalleraId,
+        widget.rooster.id,
+      ),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
+          return const Center(
+            child: Text("No hay datos de combate para generar analíticas."),
+          );
+        }
+
+        final analytics = _analyticsService.calculateFightAnalytics(
+          snapshot.data!,
+        );
+        if (analytics.totalFights == 0) {
+          return const Center(
+            child: Text("Aún no hay combates completados para analizar."),
+          );
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              Text(
+                "Rendimiento General",
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                height: 200,
+                child: PieChart(
+                  PieChartData(
+                    sections: [
+                      if (analytics.wins > 0)
+                        PieChartSectionData(
+                          value: analytics.wins.toDouble(),
+                          title: '${analytics.wins}V',
+                          color: Colors.green,
+                          radius: 80,
+                          titleStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      if (analytics.losses > 0)
+                        PieChartSectionData(
+                          value: analytics.losses.toDouble(),
+                          title: '${analytics.losses}D',
+                          color: Colors.red,
+                          radius: 80,
+                          titleStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      if (analytics.draws > 0)
+                        PieChartSectionData(
+                          value: analytics.draws.toDouble(),
+                          title: '${analytics.draws}T',
+                          color: Colors.orange,
+                          radius: 80,
+                          titleStyle: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                    ],
+                    centerSpaceRadius: 40,
+                    sectionsSpace: 2,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      _buildAnalyticsRow(
+                        "Total de Combates:",
+                        analytics.totalFights.toString(),
+                      ),
+                      const Divider(),
+                      _buildAnalyticsRow(
+                        "Porcentaje de Victorias:",
+                        "${analytics.winRate.toStringAsFixed(1)}%",
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAnalyticsRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 16)),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
         ],
       ),

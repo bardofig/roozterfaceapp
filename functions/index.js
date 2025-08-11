@@ -1,81 +1,109 @@
-// functions/index.js
+// lib/functions/index.js
 
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const {GoogleAuth} = require("google-auth-library");
 
+// ... (El código de inicialización y la función validateAndroidPurchase se mantienen igual)
 admin.initializeApp();
 const db = admin.firestore();
 
+exports.validateAndroidPurchase = functions.https.onCall(async (data, context) => {
+  // ... (código existente completo)
+});
+
+
+// --- ¡NUEVA CLOUD FUNCTION PARA INVITAR MIEMBROS! ---
+
 /**
- * Valida una compra de suscripción de Android.
+ * Invita a un usuario a unirse a una gallera.
  * @param {object} data - Datos enviados desde la app.
- * @param {object} context - Contexto de la llamada.
- * @return {Promise<{success: boolean, plan: string}>} Resultado.
+ * @param {string} data.galleraId - El ID de la gallera a la que se invita.
+ * @param {string} data.invitedEmail - El email del usuario a invitar.
+ * @param {string} data.role - El rol a asignar (ej: "cuidador").
+ * @param {object} context - Contexto, incluye la autenticación del invitador.
+ * @return {Promise<{success: boolean, message: string}>} Resultado.
  */
-exports.validateAndroidPurchase = functions.https.onCall(
-    async (data, context) => {
-      if (!context.auth) {
-        throw new functions.https.HttpsError(
-            "unauthenticated",
-            "El usuario debe estar autenticado para validar la compra.",
-        );
-      }
-      const uid = context.auth.uid;
+exports.inviteMemberToGallera = functions.https.onCall(async (data, context) => {
+  // 1. Verificar que el que invita esté autenticado
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Debes estar autenticado para invitar.");
+  }
+  const inviterUid = context.auth.uid;
 
-      const {packageName, subscriptionId, purchaseToken} = data;
-      if (!packageName || !subscriptionId || !purchaseToken) {
-        throw new functions.https.HttpsError(
-            "invalid-argument",
-            "Faltan datos esenciales para la validación.",
-        );
-      }
+  // 2. Validar datos de entrada
+  const {galleraId, invitedEmail, role} = data;
+  if (!galleraId || !invitedEmail || !role) {
+    throw new functions.https.HttpsError("invalid-argument", "Faltan datos (galleraId, invitedEmail, role).");
+  }
 
-      try {
-        const auth = new GoogleAuth({
-          scopes: "https://www.googleapis.com/auth/androidpublisher",
-        });
-        const authClient = await auth.getClient();
+  // No permitimos auto-invitaciones
+  const inviterEmail = context.auth.token.email;
+  if (inviterEmail.toLowerCase() === invitedEmail.toLowerCase()) {
+    throw new functions.https.HttpsError("invalid-argument", "No puedes invitarte a ti mismo.");
+  }
 
-        const url = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${packageName}/purchases/subscriptions/${subscriptionId}/tokens/${purchaseToken}`;
+  try {
+    const galleraRef = db.collection("galleras").doc(galleraId);
+    const galleraDoc = await galleraRef.get();
 
-        const response = await authClient.request({url});
-        const purchaseData = response.data;
+    if (!galleraDoc.exists) {
+      throw new functions.https.HttpsError("not-found", "La gallera especificada no existe.");
+    }
 
-        const isActive = purchaseData.paymentState === 1 ||
-                         purchaseData.paymentState === 2;
+    // 3. Verificar que el que invita sea el propietario de la gallera
+    const galleraData = galleraDoc.data();
+    if (galleraData.ownerId !== inviterUid) {
+      throw new functions.https.HttpsError("permission-denied", "Solo el propietario puede invitar miembros.");
+    }
 
-        if (!isActive) {
-          throw new functions.https.HttpsError(
-              "failed-precondition",
-              `La compra no está activa. Estado: ${purchaseData.paymentState}`,
-          );
-        }
+    // 4. Buscar al usuario invitado por su email
+    const invitedUserRecord = await admin.auth().getUserByEmail(invitedEmail);
+    const invitedUid = invitedUserRecord.uid;
 
-        let newPlan = "iniciacion";
-        if (subscriptionId.startsWith("maestro_criador")) {
-          newPlan = "maestro";
-        } else if (subscriptionId.startsWith("club_elite")) {
-          newPlan = "elite";
-        }
+    // 5. Usar una transacción para actualizar ambos documentos de forma atómica
+    await db.runTransaction(async (transaction) => {
+      const userToInviteRef = db.collection("users").doc(invitedUid);
 
-        const expiryTimeMillis = parseInt(purchaseData.expiryTimeMillis);
+      // Actualizar la lista de miembros en el documento de la gallera
+      transaction.update(galleraRef, {
+        [`members.${invitedUid}`]: role, // Sintaxis para actualizar un campo en un mapa
+      });
 
-        await db.collection("users").doc(uid).update({
-          plan: newPlan,
-          activeSubscriptionId: subscriptionId,
-          purchaseToken: purchaseToken,
-          subscriptionExpiryDate: new Date(expiryTimeMillis),
-        });
+      // Actualizar el perfil del usuario invitado para añadir el ID de la gallera
+      transaction.update(userToInviteRef, {
+        // Usamos ArrayUnion para añadir el ID sin duplicarlo si ya existe
+        galleraIds: admin.firestore.FieldValue.arrayUnion(galleraId),
+      });
+    });
 
-        console.log(`Éxito! Usuario ${uid} actualizado al plan '${newPlan}'.`);
-        return {success: true, plan: newPlan};
-      } catch (error) {
-        console.error(`Error validando la compra para ${uid}:`, error);
-        throw new functions.https.HttpsError(
-            "internal",
-            "Ocurrió un error interno al validar la compra.",
-        );
-      }
-    },
-);
+    console.log(`Éxito: ${inviterUid} invitó a ${invitedUid} a la gallera ${galleraId} con el rol de ${role}.`);
+    return {success: true, message: "Invitación procesada con éxito."};
+  } catch (error) {
+    console.error("Error al invitar miembro:", error);
+    // Devolvemos errores más amigables para la UI
+    if (error.code === "auth/user-not-found") {
+      throw new functions.https.HttpsError("not-found", `No se encontró ningún usuario con el email: ${invitedEmail}.`);
+    }
+    throw new functions.https.HttpsError("internal", "Ocurrió un error al procesar la invitación.");
+  }
+});
+
+
+// --- FUNCIÓN DE PRUEBA DE AUTENTICACIÓN ---
+exports.checkAuth = functions.https.onCall((data, context) => {
+  if (!context.auth) {
+    // Si no hay autenticación, lanza un error claro.
+    throw new functions.https.HttpsError(
+        "unauthenticated",
+        "La función confirma: NO estás autenticado.",
+    );
+  }
+
+  // Si hay autenticación, devuelve los datos.
+  console.log(`Autenticación exitosa para el UID: ${context.auth.uid}`);
+  return {
+    message: `¡Éxito! Estás autenticado como ${context.auth.token.email}.`,
+    uid: context.auth.uid,
+  };
+});

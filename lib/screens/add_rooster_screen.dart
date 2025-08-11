@@ -10,84 +10,16 @@ import 'package:roozterfaceapp/data/options_data.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';
 
-// Widget de ayuda para los campos de autocompletado
-class AutocompleteTextField extends StatelessWidget {
-  final TextEditingController controller;
-  final String label;
-  final List<String> options;
-
-  const AutocompleteTextField({
-    super.key,
-    required this.controller,
-    required this.label,
-    required this.options,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Autocomplete<String>(
-      initialValue: TextEditingValue(text: controller.text),
-      optionsBuilder: (TextEditingValue textEditingValue) {
-        if (textEditingValue.text.isEmpty) {
-          return const Iterable<String>.empty();
-        }
-        return options.where((String option) {
-          return option.toLowerCase().contains(
-            textEditingValue.text.toLowerCase(),
-          );
-        });
-      },
-      onSelected: (String selection) {
-        controller.text = selection;
-        FocusScope.of(context).unfocus();
-      },
-      fieldViewBuilder:
-          (context, textEditingController, focusNode, onFieldSubmitted) {
-            return TextField(
-              controller: textEditingController,
-              focusNode: focusNode,
-              decoration: InputDecoration(labelText: label),
-              textCapitalization: TextCapitalization.words,
-              onChanged: (text) => controller.text = text,
-            );
-          },
-      optionsViewBuilder: (context, onSelected, options) {
-        return Align(
-          alignment: Alignment.topLeft,
-          child: Material(
-            elevation: 4.0,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: ListView.builder(
-                padding: EdgeInsets.zero,
-                shrinkWrap: true,
-                itemCount: options.length,
-                itemBuilder: (BuildContext context, int index) {
-                  final String option = options.elementAt(index);
-                  return InkWell(
-                    onTap: () {
-                      onSelected(option);
-                    },
-                    child: ListTile(title: Text(option)),
-                  );
-                },
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
 class AddRoosterScreen extends StatefulWidget {
   final RoosterModel? roosterToEdit;
   final String currentUserPlan;
+  final String activeGalleraId;
 
   const AddRoosterScreen({
     super.key,
     this.roosterToEdit,
     required this.currentUserPlan,
+    required this.activeGalleraId,
   });
 
   @override
@@ -95,7 +27,6 @@ class AddRoosterScreen extends StatefulWidget {
 }
 
 class _AddRoosterScreenState extends State<AddRoosterScreen> {
-  // --- VARIABLES PARA EL SCROLL Y FORMULARIO ---
   final _scrollController = ScrollController();
   final _formKey = GlobalKey<FormState>();
   static const _formPageStorageKey = PageStorageKey('addRoosterForm');
@@ -105,10 +36,6 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
   final _plateController = TextEditingController();
   final _fatherLineageController = TextEditingController();
   final _motherLineageController = TextEditingController();
-  final _breedLineController = TextEditingController();
-  final _colorController = TextEditingController();
-  final _combTypeController = TextEditingController();
-  final _legColorController = TextEditingController();
 
   // Variables de Estado
   DateTime? _selectedDate;
@@ -130,7 +57,6 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
   String? _selectedCombType;
   String? _selectedLegColor;
   BreedProfile? _selectedBreedProfile;
-  bool _lineageIdsInitialized = false;
 
   @override
   void initState() {
@@ -162,10 +88,6 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
     _plateController.dispose();
     _fatherLineageController.dispose();
     _motherLineageController.dispose();
-    _breedLineController.dispose();
-    _colorController.dispose();
-    _combTypeController.dispose();
-    _legColorController.dispose();
     super.dispose();
   }
 
@@ -291,6 +213,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
     try {
       if (widget.roosterToEdit != null) {
         await _roosterService.updateRooster(
+          galleraId: widget.activeGalleraId,
           roosterId: widget.roosterToEdit!.id,
           name: _nameController.text,
           plate: _plateController.text,
@@ -311,6 +234,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
         );
       } else {
         await _roosterService.addNewRooster(
+          galleraId: widget.activeGalleraId,
           name: _nameController.text,
           plate: _plateController.text,
           status: _selectedStatus!,
@@ -360,11 +284,9 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Editar Gallo' : 'Añadir Nuevo Gallo'),
-        backgroundColor: Colors.grey[900],
-        foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<RoosterModel>>(
-        stream: _roosterService.getRoostersStream(),
+        stream: _roosterService.getRoostersStream(widget.activeGalleraId),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -373,27 +295,6 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
             return Center(child: Text("Error: ${snapshot.error}"));
           }
           final allRoosters = snapshot.data ?? [];
-
-          final uniqueBreedLines = allRoosters
-              .map((r) => r.breedLine)
-              .whereType<String>()
-              .toSet()
-              .toList();
-          final uniqueColors = allRoosters
-              .map((r) => r.color)
-              .whereType<String>()
-              .toSet()
-              .toList();
-          final uniqueCombTypes = allRoosters
-              .map((r) => r.combType)
-              .whereType<String>()
-              .toSet()
-              .toList();
-          final uniqueLegColors = allRoosters
-              .map((r) => r.legColor)
-              .whereType<String>()
-              .toSet()
-              .toList();
 
           final List<String> breedingStatuses = ['activo', 'descansando'];
           final possibleParents = allRoosters.where((r) {
@@ -406,25 +307,25 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
             return isNotSelf && isBreedable;
           }).toList();
 
-          final dropdownItems = possibleParents.map((rooster) {
-            return DropdownMenuItem<String>(
-              value: rooster.id,
-              child: Text("${rooster.name} (${rooster.plate})"),
-            );
-          }).toList();
+          final dropdownItems = possibleParents
+              .map(
+                (rooster) => DropdownMenuItem<String>(
+                  value: rooster.id,
+                  child: Text("${rooster.name} (${rooster.plate})"),
+                ),
+              )
+              .toList();
 
-          if (isEditing && !_lineageIdsInitialized) {
-            final rooster = widget.roosterToEdit!;
-            if (rooster.fatherId != null &&
-                possibleParents.any((p) => p.id == rooster.fatherId)) {
-              _selectedFatherId = rooster.fatherId;
-            }
-            if (rooster.motherId != null &&
-                possibleParents.any((p) => p.id == rooster.motherId)) {
-              _selectedMotherId = rooster.motherId;
-            }
-            _lineageIdsInitialized = true;
-          }
+          final validFatherId =
+              _selectedFatherId != null &&
+                  possibleParents.any((p) => p.id == _selectedFatherId)
+              ? _selectedFatherId
+              : null;
+          final validMotherId =
+              _selectedMotherId != null &&
+                  possibleParents.any((p) => p.id == _selectedMotherId)
+              ? _selectedMotherId
+              : null;
 
           return SingleChildScrollView(
             key: _formPageStorageKey,
@@ -484,9 +385,10 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+
                   Text(
-                    "Datos Básicos",
-                    style: Theme.of(context).textTheme.titleMedium,
+                    "Datos del Ejemplar",
+                    style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
@@ -535,12 +437,6 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                         _selectedStatus = newValue;
                       });
                     },
-                  ),
-
-                  const Divider(height: 32),
-                  Text(
-                    "Características",
-                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
@@ -637,11 +533,11 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                         const Divider(height: 32),
                         Text(
                           "Linaje (Plan Maestro Criador)",
-                          style: Theme.of(context).textTheme.titleMedium,
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
-                          value: _selectedFatherId,
+                          value: validFatherId,
                           decoration: const InputDecoration(
                             labelText: 'Padre (Semental Registrado)',
                           ),
@@ -667,7 +563,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                         ),
                         const SizedBox(height: 24),
                         DropdownButtonFormField<String>(
-                          value: _selectedMotherId,
+                          value: validMotherId,
                           decoration: const InputDecoration(
                             labelText: 'Madre (Gallina Registrada)',
                           ),
@@ -701,12 +597,14 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                           ? null
                           : () => _saveRooster(allRoosters),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.black,
-                        foregroundColor: Colors.white,
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor: Theme.of(
+                          context,
+                        ).colorScheme.onPrimary,
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       child: _isSaving
-                          ? const CircularProgressIndicator(color: Colors.white)
+                          ? const CircularProgressIndicator()
                           : Text(
                               isEditing ? 'Guardar Cambios' : 'Guardar Gallo',
                             ),

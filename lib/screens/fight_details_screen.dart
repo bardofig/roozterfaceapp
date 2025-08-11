@@ -7,25 +7,32 @@ import 'package:roozterfaceapp/screens/add_fight_screen.dart';
 import 'package:roozterfaceapp/services/fight_service.dart';
 
 class FightDetailsScreen extends StatelessWidget {
+  final String galleraId;
   final String roosterId;
   final FightModel fight;
 
   const FightDetailsScreen({
     super.key,
+    required this.galleraId,
     required this.roosterId,
     required this.fight,
   });
 
+  // Navega al formulario en modo edición
   void _goToEditScreen(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) =>
-            AddFightScreen(roosterId: roosterId, fightToEdit: fight),
+        builder: (context) => AddFightScreen(
+          galleraId: galleraId,
+          roosterId: roosterId,
+          fightToEdit: fight,
+        ),
       ),
     );
   }
 
+  // Lógica para borrar el evento
   void _deleteFight(BuildContext context) async {
     bool? confirm = await showDialog<bool>(
       context: context,
@@ -51,9 +58,12 @@ class FightDetailsScreen extends StatelessWidget {
     if (confirm == true && context.mounted) {
       try {
         final fightService = FightService();
-        await fightService.deleteFight(roosterId: roosterId, fightId: fight.id);
-        int count = 0;
-        Navigator.of(context).popUntil((_) => count++ >= 1);
+        await fightService.deleteFight(
+          galleraId: galleraId,
+          roosterId: roosterId,
+          fightId: fight.id,
+        );
+        Navigator.of(context).pop(); // Cierra esta pantalla de detalles
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Evento de combate borrado.')),
         );
@@ -65,12 +75,41 @@ class FightDetailsScreen extends StatelessWidget {
     }
   }
 
+  // Widget de ayuda para las filas de detalles
+  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
+    if (value.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              value.isNotEmpty ? value : 'No hay notas.',
+              textAlign: TextAlign.right,
+              style: TextStyle(color: valueColor),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Widget de ayuda para crear las tarjetas de sección
   Widget _buildInfoCard({
     required BuildContext context,
     required String title,
     required IconData icon,
     required List<Widget> children,
   }) {
+    // Si no hay hijos (filas de detalle), no muestra la tarjeta
+    if (children.every(
+      (widget) => widget is SizedBox && widget.height == 0.0,
+    )) {
+      return const SizedBox.shrink();
+    }
     return Card(
       elevation: 2,
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -95,36 +134,6 @@ class FightDetailsScreen extends StatelessWidget {
     );
   }
 
-  // --- WIDGET DE AYUDA PARA FILAS DE DETALLES CORREGIDO (MANTIENE DISEÑO ORIGINAL) ---
-  Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
-    // Si el valor está vacío (excepto para notas), no mostramos la fila.
-    if (value.isEmpty && !label.toLowerCase().contains('notas'))
-      return const SizedBox.shrink();
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start, // Alinear al inicio verticalmente
-        children: [
-          // La etiqueta ocupa un espacio fijo
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(width: 16),
-          // El valor es flexible y puede ocupar el resto del espacio
-          Expanded(
-            child: Text(
-              value.isNotEmpty
-                  ? value
-                  : 'No hay notas.', // Texto por defecto para notas
-              textAlign: TextAlign.right, // Alinear a la derecha
-              style: TextStyle(color: valueColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final bool isCompleted = fight.status == 'Completado';
@@ -135,8 +144,6 @@ class FightDetailsScreen extends StatelessWidget {
         title: Text(
           isCompleted ? 'Resultado del Combate' : 'Evento Programado',
         ),
-        backgroundColor: Colors.grey[900],
-        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
@@ -148,7 +155,7 @@ class FightDetailsScreen extends StatelessWidget {
           ),
         ],
       ),
-      backgroundColor: Colors.grey[200],
+      backgroundColor: Theme.of(context).colorScheme.background,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -163,7 +170,6 @@ class FightDetailsScreen extends StatelessWidget {
                 _buildDetailRow('Estado', fight.status),
               ],
             ),
-
             if (isCompleted)
               _buildInfoCard(
                 context: context,
@@ -191,7 +197,6 @@ class FightDetailsScreen extends StatelessWidget {
                     'Duración',
                     fight.fightDuration ?? 'No especificado',
                   ),
-                  // La fila de "Heridas" ahora funcionará con texto largo
                   _buildDetailRow(
                     'Heridas Sufridas',
                     fight.injuriesSustained ?? 'Ninguna',
@@ -206,8 +211,6 @@ class FightDetailsScreen extends StatelessWidget {
                     ),
                 ],
               ),
-
-            // La tarjeta de "Notas" también se beneficiará de la corrección
             _buildInfoCard(
               context: context,
               title: 'Notas y Observaciones',

@@ -15,7 +15,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   final PaymentService _paymentService = PaymentService();
   bool _isLoadingProducts = true;
   List<ProductDetails> _products = [];
-  String _currentUserPlan = 'iniciacion';
+  final String _currentUserPlan = 'iniciacion';
 
   @override
   void initState() {
@@ -79,7 +79,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Planes y Suscripción')),
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: ValueListenableBuilder<PurchaseProcessStatus>(
         valueListenable: _paymentService.purchaseStatusNotifier,
         builder: (context, status, child) {
@@ -215,7 +215,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
         : theme.cardColor;
     final Color textColor = isRecommended
         ? Colors.white
-        : theme.colorScheme.onBackground;
+        : theme.colorScheme.onSurface;
     final Color checkColor = isRecommended ? Colors.white : Colors.green;
     final Color buttonBgColor = isRecommended
         ? Colors.white

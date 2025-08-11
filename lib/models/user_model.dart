@@ -15,6 +15,11 @@ class UserModel {
   final String city;
   final String country;
   final String plan;
+  final String? activeGalleraId;
+
+  // --- ¡NUEVO CAMPO! ---
+  // Lista de IDs de las galleras a las que pertenece o es miembro
+  final List<String> galleraIds;
 
   UserModel({
     required this.uid,
@@ -29,11 +34,15 @@ class UserModel {
     required this.city,
     required this.country,
     this.plan = 'iniciacion',
+    this.activeGalleraId,
+    this.galleraIds = const [], // Valor por defecto: lista vacía
   });
 
-  // Método para crear una instancia de UserModel desde un snapshot de Firestore
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    // Convertimos la lista de Firestore a una lista de Strings
+    List<String> galleras = List<String>.from(data['galleraIds'] ?? []);
+
     return UserModel(
       uid: data['uid'] ?? '',
       email: data['email'] ?? '',
@@ -47,10 +56,11 @@ class UserModel {
       city: data['city'] ?? '',
       country: data['country'] ?? '',
       plan: data['plan'] ?? 'iniciacion',
+      activeGalleraId: data['activeGalleraId'],
+      galleraIds: galleras,
     );
   }
 
-  // Método para convertir el objeto a un mapa para guardarlo en Firestore
   Map<String, dynamic> toJson() {
     return {
       'uid': uid,
@@ -65,6 +75,8 @@ class UserModel {
       'city': city,
       'country': country,
       'plan': plan,
+      'activeGalleraId': activeGalleraId,
+      'galleraIds': galleraIds,
     };
   }
 }

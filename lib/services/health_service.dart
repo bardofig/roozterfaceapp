@@ -1,27 +1,32 @@
 // lib/services/health_service.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:roozterfaceapp/models/health_log_model.dart';
 
 class HealthService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String? get currentUserId => _auth.currentUser?.uid;
-
-  CollectionReference _healthLogsCollection(String roosterId) {
-    if (currentUserId == null) throw Exception("Usuario no autenticado.");
+  // Apunta a la sub-sub-colección de salud, ahora desde /galleras
+  CollectionReference _healthLogsCollection(
+    String galleraId,
+    String roosterId,
+  ) {
     return _firestore
-        .collection('users')
-        .doc(currentUserId)
+        .collection('galleras')
+        .doc(galleraId)
         .collection('gallos')
         .doc(roosterId)
         .collection('health_logs');
   }
 
-  Stream<List<HealthLogModel>> getHealthLogsStream(String roosterId) {
+  // Obtiene la lista de registros de salud de una gallera y gallo específicos
+  Stream<List<HealthLogModel>> getHealthLogsStream(
+    String galleraId,
+    String roosterId,
+  ) {
+    if (galleraId.isEmpty) return Stream.value([]);
     return _healthLogsCollection(
+      galleraId,
       roosterId,
     ).orderBy('date', descending: true).snapshots().map((snapshot) {
       return snapshot.docs
@@ -30,7 +35,9 @@ class HealthService {
     });
   }
 
+  // Añade un registro de salud a una gallera y gallo específicos
   Future<void> addHealthLog({
+    required String galleraId,
     required String roosterId,
     required DateTime date,
     required String logCategory,
@@ -48,14 +55,15 @@ class HealthService {
         'dosage': dosage,
         'notes': notes,
       };
-      await _healthLogsCollection(roosterId).add(logData);
+      await _healthLogsCollection(galleraId, roosterId).add(logData);
     } catch (e) {
       throw Exception("Ocurrió un error al guardar el registro de salud.");
     }
   }
 
-  // --- ¡NUEVO MÉTODO UPDATE! ---
+  // Actualiza un registro de salud en una gallera y gallo específicos
   Future<void> updateHealthLog({
+    required String galleraId,
     required String roosterId,
     required String logId,
     required DateTime date,
@@ -74,19 +82,23 @@ class HealthService {
         'dosage': dosage,
         'notes': notes,
       };
-      await _healthLogsCollection(roosterId).doc(logId).update(logData);
+      await _healthLogsCollection(
+        galleraId,
+        roosterId,
+      ).doc(logId).update(logData);
     } catch (e) {
       throw Exception("Ocurrió un error al actualizar el registro de salud.");
     }
   }
 
-  // --- MÉTODO DELETE (ya estaba, pero lo confirmamos) ---
+  // Borra un registro de salud de una gallera y gallo específicos
   Future<void> deleteHealthLog({
+    required String galleraId,
     required String roosterId,
     required String logId,
   }) async {
     try {
-      await _healthLogsCollection(roosterId).doc(logId).delete();
+      await _healthLogsCollection(galleraId, roosterId).doc(logId).delete();
     } catch (e) {
       throw Exception("Ocurrió un error al borrar el registro de salud.");
     }

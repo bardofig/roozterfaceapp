@@ -54,9 +54,10 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDlxrPXdX0g1NkKuY47jJ0ivNYGxhdfeSY',
-    appId: '1:272367103913:android:3b1663f2151ebf06c39eb8',
+    appId: '1:272367103913:android:626c8e1040fe9450c39eb8',
     messagingSenderId: '272367103913',
     projectId: 'roozterface',
     storageBucket: 'roozterface.firebasestorage.app',
   );
+
 }
