@@ -2,15 +2,14 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import 'package:roozterfaceapp/models/user_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class GalleraService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseFunctions _functions = FirebaseFunctions.instanceFor(
-    region: 'us-central1',
-  );
+  final FirebaseFunctions _functions =
+      FirebaseFunctions.instanceFor(region: 'us-central1');
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  // Obtiene los datos de una gallera específica en tiempo real
   Stream<DocumentSnapshot> getGalleraStream(String galleraId) {
     if (galleraId.isEmpty) {
       return const Stream.empty();
@@ -18,50 +17,55 @@ class GalleraService {
     return _firestore.collection('galleras').doc(galleraId).snapshots();
   }
 
-  // Obtiene una lista de documentos de galleras a partir de una lista de IDs
   Stream<QuerySnapshot> getGallerasByIds(List<String> galleraIds) {
     if (galleraIds.isEmpty) {
       return const Stream.empty();
     }
-    // Usamos 'whereIn' para obtener todos los documentos cuya ID esté en la lista
     return _firestore
         .collection('galleras')
         .where(FieldPath.documentId, whereIn: galleraIds)
         .snapshots();
   }
 
-  // Obtiene los perfiles de usuario de los miembros de una gallera
-  Stream<List<UserModel>> getMembersProfilesStream(List<String> memberIds) {
-    if (memberIds.isEmpty) {
-      return Stream.value([]);
+  Future<List<Map<String, dynamic>>> getMemberDetails({
+    required String galleraId,
+  }) async {
+    final callable = _functions.httpsCallable('getGalleraMemberDetails');
+    try {
+      final result = await callable.call<dynamic>({
+        'galleraId': galleraId,
+      });
+
+      // --- CORRECCIÓN DEFINITIVA: CONVERSIÓN MANUAL Y SEGURA ---
+      final List<dynamic> memberList = result.data as List<dynamic>;
+      // Creamos una nueva lista, convirtiendo cada mapa explícitamente.
+      final List<Map<String, dynamic>> typedList =
+          List<Map<String, dynamic>>.from(
+        memberList.map((item) => Map<String, dynamic>.from(item as Map)),
+      );
+      return typedList;
+    } on FirebaseFunctionsException catch (e) {
+      print("Error en 'getGalleraMemberDetails': [${e.code}] ${e.message}");
+      throw Exception(e.message ?? "Ocurrió un error en la nube.");
+    } catch (e) {
+      print("Error inesperado en getMemberDetails: $e");
+      throw Exception(
+          e.toString()); // Lanzamos el error de tipado para verlo claramente
     }
-    return _firestore
-        .collection('users')
-        .where(FieldPath.documentId, whereIn: memberIds)
-        .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => UserModel.fromFirestore(doc))
-              .toList();
-        });
   }
 
-  // Actualiza el nombre de una gallera
   Future<void> updateGalleraName({
     required String galleraId,
     required String newName,
   }) async {
     if (galleraId.isEmpty || newName.isEmpty) {
-      throw Exception(
-        "El ID de la gallera y el nuevo nombre no pueden estar vacíos.",
-      );
+      throw Exception("Datos inválidos.");
     }
     await _firestore.collection('galleras').doc(galleraId).update({
       'name': newName,
     });
   }
 
-  // Llama a la Cloud Function para invitar a un nuevo miembro
   Future<HttpsCallableResult> inviteMember({
     required String galleraId,
     required String invitedEmail,
@@ -69,14 +73,27 @@ class GalleraService {
   }) async {
     final callable = _functions.httpsCallable('inviteMemberToGallera');
     try {
-      return await callable.call(<String, dynamic>{
+      return await callable.call<dynamic>({
         'galleraId': galleraId,
         'invitedEmail': invitedEmail,
         'role': role,
       });
     } on FirebaseFunctionsException catch (e) {
-      // Hacemos que el mensaje de error sea más legible para la UI
-      print("Error de Cloud Function: ${e.code} - ${e.message}");
+      throw Exception(e.message);
+    }
+  }
+
+  Future<HttpsCallableResult> removeMember({
+    required String galleraId,
+    required String memberId,
+  }) async {
+    final callable = _functions.httpsCallable('removeMemberFromGallera');
+    try {
+      return await callable.call<dynamic>({
+        'galleraId': galleraId,
+        'memberId': memberId,
+      });
+    } on FirebaseFunctionsException catch (e) {
       throw Exception(e.message);
     }
   }

@@ -6,10 +6,14 @@ import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
-// --- ¡DEFINICIÓN AHORA PÚBLICA! ---
-// Al estar fuera de la clase, cualquier archivo que importe este servicio
-// podrá usar 'PurchaseProcessStatus'.
-enum PurchaseProcessStatus { idle, pending, verifying, completed, error }
+enum PurchaseProcessStatus {
+  idle,
+  pending,
+  verifying,
+  completed,
+  error,
+  restored,
+}
 
 class PaymentService {
   static final PaymentService _instance = PaymentService._internal();
@@ -30,6 +34,7 @@ class PaymentService {
   };
 
   List<ProductDetails> _products = [];
+  List<ProductDetails> get products => _products;
 
   void initialize() {
     final Stream<List<PurchaseDetails>> purchaseUpdated =
@@ -49,7 +54,11 @@ class PaymentService {
 
   Future<void> loadProducts() async {
     final bool available = await _inAppPurchase.isAvailable();
-    if (!available) return;
+    if (!available) {
+      print("La tienda de compras no está disponible.");
+      _products = [];
+      return;
+    }
     final ProductDetailsResponse response = await _inAppPurchase
         .queryProductDetails(_productIds);
     if (response.notFoundIDs.isNotEmpty) {
@@ -62,7 +71,21 @@ class PaymentService {
     final PurchaseParam purchaseParam = PurchaseParam(
       productDetails: productDetails,
     );
+    // Para suscripciones, se usa buyNonConsumable.
     await _inAppPurchase.buyNonConsumable(purchaseParam: purchaseParam);
+  }
+
+  // --- ¡NUEVO MÉTODO PARA RESTAURAR COMPRAS! ---
+  Future<void> restorePurchases() async {
+    purchaseStatusNotifier.value = PurchaseProcessStatus.pending;
+    try {
+      await _inAppPurchase.restorePurchases();
+      // El resultado se manejará en el _listenToPurchaseUpdated,
+      // que cambiará el estado a 'restored' o 'error'.
+    } catch (e) {
+      print("Error restaurando compras: $e");
+      purchaseStatusNotifier.value = PurchaseProcessStatus.error;
+    }
   }
 
   void _listenToPurchaseUpdated(List<PurchaseDetails> purchaseDetailsList) {
@@ -79,16 +102,13 @@ class PaymentService {
           }
           break;
         case PurchaseStatus.purchased:
+          _handlePurchase(purchaseDetails);
+          break;
         case PurchaseStatus.restored:
-          if (purchaseDetails is GooglePlayPurchaseDetails) {
-            purchaseStatusNotifier.value = PurchaseProcessStatus.verifying;
-            _verifyAndroidPurchase(purchaseDetails);
-          } else {
-            if (purchaseDetails.pendingCompletePurchase) {
-              _inAppPurchase.completePurchase(purchaseDetails);
-            }
-            purchaseStatusNotifier.value = PurchaseProcessStatus.completed;
-          }
+          // Cuando una compra se restaura, la tratamos igual que una nueva compra
+          // para revalidarla y actualizar el estado del usuario en nuestro backend.
+          _handlePurchase(purchaseDetails);
+          purchaseStatusNotifier.value = PurchaseProcessStatus.restored;
           break;
         case PurchaseStatus.canceled:
           purchaseStatusNotifier.value = PurchaseProcessStatus.idle;
@@ -100,6 +120,20 @@ class PaymentService {
     }
   }
 
+  // Método unificado para manejar tanto compras nuevas como restauradas
+  Future<void> _handlePurchase(PurchaseDetails purchaseDetails) async {
+    if (purchaseDetails is GooglePlayPurchaseDetails) {
+      purchaseStatusNotifier.value = PurchaseProcessStatus.verifying;
+      await _verifyAndroidPurchase(purchaseDetails);
+    } else {
+      // Para otras plataformas o si no se necesita verificación de servidor
+      if (purchaseDetails.pendingCompletePurchase) {
+        await _inAppPurchase.completePurchase(purchaseDetails);
+      }
+      purchaseStatusNotifier.value = PurchaseProcessStatus.completed;
+    }
+  }
+
   Future<void> _verifyAndroidPurchase(
     GooglePlayPurchaseDetails purchaseDetails,
   ) async {
@@ -107,28 +141,24 @@ class PaymentService {
       final functions = FirebaseFunctions.instanceFor(region: "us-central1");
       final callable = functions.httpsCallable('validateAndroidPurchase');
 
-      final results = await callable.call(<String, dynamic>{
+      await callable.call<dynamic>({
         'packageName': 'com.codigobardo.roozterface',
         'subscriptionId': purchaseDetails.productID,
         'purchaseToken':
             purchaseDetails.verificationData.serverVerificationData,
       });
 
-      if (results.data['success'] == true) {
-        if (purchaseDetails.pendingCompletePurchase) {
-          await _inAppPurchase.completePurchase(purchaseDetails);
-        }
-        purchaseStatusNotifier.value = PurchaseProcessStatus.completed;
-      } else {
-        purchaseStatusNotifier.value = PurchaseProcessStatus.error;
+      // La Cloud Function ahora actualiza el plan.
+      // El UserDataProvider detectará el cambio y la UI se actualizará.
+      if (purchaseDetails.pendingCompletePurchase) {
+        await _inAppPurchase.completePurchase(purchaseDetails);
       }
+      purchaseStatusNotifier.value = PurchaseProcessStatus.completed;
     } catch (e) {
-      print("Error al llamar a la Cloud Function: $e");
+      print("Error al llamar a la Cloud Function de validación: $e");
       purchaseStatusNotifier.value = PurchaseProcessStatus.error;
     }
   }
-
-  List<ProductDetails> get products => _products;
 
   void dispose() {
     _subscription.cancel();

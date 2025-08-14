@@ -1,36 +1,38 @@
 // lib/services/fight_service.dart
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:roozterfaceapp/models/fight_model.dart';
 
 class FightService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  String? get currentUserId => _auth.currentUser?.uid;
-
-  CollectionReference _fightsCollection(String roosterId) {
-    if (currentUserId == null) throw Exception("Usuario no autenticado.");
+  // --- CORREGIDO ---
+  // Ahora apunta a la subcolección dentro de /galleras
+  CollectionReference _fightsCollection(String galleraId, String roosterId) {
     return _firestore
-        .collection('users')
-        .doc(currentUserId)
+        .collection('galleras')
+        .doc(galleraId)
         .collection('gallos')
         .doc(roosterId)
         .collection('fights');
   }
 
-  DocumentReference _roosterDocument(String roosterId) {
-    if (currentUserId == null) throw Exception("Usuario no autenticado.");
+  // --- CORREGIDO ---
+  // Apunta al documento del gallo dentro de la gallera
+  DocumentReference _roosterDocument(String galleraId, String roosterId) {
     return _firestore
-        .collection('users')
-        .doc(currentUserId)
+        .collection('galleras')
+        .doc(galleraId)
         .collection('gallos')
         .doc(roosterId);
   }
 
-  Stream<List<FightModel>> getFightsStream(String roosterId, String id) {
+  // --- CORREGIDO ---
+  // El stream ahora necesita la galleraId
+  Stream<List<FightModel>> getFightsStream(String galleraId, String roosterId) {
+    if (galleraId.isEmpty) return Stream.value([]);
     return _fightsCollection(
+      galleraId,
       roosterId,
     ).orderBy('date', descending: true).snapshots().map((snapshot) {
       return snapshot.docs.map((doc) => FightModel.fromFirestore(doc)).toList();
@@ -38,11 +40,11 @@ class FightService {
   }
 
   Future<void> addFight({
+    required String galleraId,
     required String roosterId,
     required DateTime date,
     required String location,
     String? preparationNotes,
-    required String galleraId,
   }) async {
     try {
       Map<String, dynamic> fightData = {
@@ -58,14 +60,14 @@ class FightService {
         'fightDuration': null,
         'injuriesSustained': null,
       };
-      await _fightsCollection(roosterId).add(fightData);
+      await _fightsCollection(galleraId, roosterId).add(fightData);
     } catch (e) {
       throw Exception("Ocurrió un error al programar el combate.");
     }
   }
 
-  // --- ¡MÉTODO UPDATEFIGHT CORREGIDO Y COMPLETO! ---
   Future<void> updateFight({
+    required String galleraId, // Esencial para la ruta
     required String roosterId,
     required String fightId,
     required DateTime date,
@@ -75,18 +77,20 @@ class FightService {
     String? result,
     String? postFightNotes,
     required bool survived,
-    // --- ¡PARÁMETROS AÑADIDOS! ---
     String? weaponType,
     String? fightDuration,
     String? injuriesSustained,
-    required String galleraId,
   }) async {
     try {
       await _firestore.runTransaction((transaction) async {
         DocumentReference fightDocRef = _fightsCollection(
+          galleraId,
           roosterId,
         ).doc(fightId);
-        DocumentReference roosterDocRef = _roosterDocument(roosterId);
+        DocumentReference roosterDocRef = _roosterDocument(
+          galleraId,
+          roosterId,
+        ); // --- CORREGIDO ---
 
         DocumentSnapshot roosterSnapshot = await transaction.get(roosterDocRef);
         if (!roosterSnapshot.exists) {
@@ -103,7 +107,6 @@ class FightService {
           'result': result,
           'postFightNotes': postFightNotes,
           'survived': survived,
-          // --- DATOS A GUARDAR ---
           'weaponType': weaponType,
           'fightDuration': fightDuration,
           'injuriesSustained': injuriesSustained,
@@ -126,12 +129,12 @@ class FightService {
   }
 
   Future<void> deleteFight({
+    required String galleraId,
     required String roosterId,
     required String fightId,
-    required String galleraId,
   }) async {
     try {
-      await _fightsCollection(roosterId).doc(fightId).delete();
+      await _fightsCollection(galleraId, roosterId).doc(fightId).delete();
     } catch (e) {
       throw Exception("Ocurrió un error al borrar el evento.");
     }

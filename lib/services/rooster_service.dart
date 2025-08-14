@@ -22,14 +22,11 @@ class RoosterService {
         .collection('gallos');
   }
 
-  // MÉTODO ASÍNCRONO PARA OBTENER EL PERFIL UNA SOLA VEZ
   Future<UserModel?> getUserProfile() async {
     final user = _auth.currentUser;
     if (user != null) {
-      final docSnapshot = await _firestore
-          .collection('users')
-          .doc(user.uid)
-          .get();
+      final docSnapshot =
+          await _firestore.collection('users').doc(user.uid).get();
       if (docSnapshot.exists) {
         return UserModel.fromFirestore(docSnapshot);
       }
@@ -37,7 +34,6 @@ class RoosterService {
     return null;
   }
 
-  // Stream del perfil (lo mantenemos por si lo usamos en otro lugar)
   Stream<DocumentSnapshot> getUserProfileStream() {
     final user = _auth.currentUser;
     if (user != null) {
@@ -49,9 +45,10 @@ class RoosterService {
 
   Stream<List<RoosterModel>> getRoostersStream(String galleraId) {
     if (galleraId.isEmpty) return Stream.value([]);
-    return _roostersCollection(
-      galleraId,
-    ).orderBy('createdAt', descending: true).snapshots().map((snapshot) {
+    return _roostersCollection(galleraId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
       return snapshot.docs
           .map((doc) => RoosterModel.fromFirestore(doc))
           .toList();
@@ -64,9 +61,8 @@ class RoosterService {
   ) async {
     if (galleraId.isEmpty) return null;
     try {
-      final docSnapshot = await _roostersCollection(
-        galleraId,
-      ).doc(roosterId).get();
+      final docSnapshot =
+          await _roostersCollection(galleraId).doc(roosterId).get();
       if (docSnapshot.exists) {
         return RoosterModel.fromFirestore(docSnapshot);
       }
@@ -74,6 +70,22 @@ class RoosterService {
     } catch (e) {
       print("Error al obtener el gallo por ID ($roosterId): $e");
       return null;
+    }
+  }
+
+  Future<List<RoosterModel>> getRoostersByIds(
+      String galleraId, List<String> roosterIds) async {
+    if (galleraId.isEmpty || roosterIds.isEmpty) return [];
+    try {
+      final querySnapshot = await _roostersCollection(galleraId)
+          .where(FieldPath.documentId, whereIn: roosterIds)
+          .get();
+      return querySnapshot.docs
+          .map((doc) => RoosterModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      print("Error al obtener gallos por IDs: $e");
+      return [];
     }
   }
 
@@ -94,6 +106,8 @@ class RoosterService {
     String? color,
     String? combType,
     String? legColor,
+    double? salePrice,
+    bool? showInShowcase,
   }) async {
     if (currentUserId == null) throw Exception("Usuario no autenticado.");
     String filePath =
@@ -111,6 +125,7 @@ class RoosterService {
         'birthDate': Timestamp.fromDate(birthDate),
         'imageUrl': downloadUrl,
         'createdAt': FieldValue.serverTimestamp(),
+        'lastUpdate': FieldValue.serverTimestamp(),
         'fatherId': fatherId,
         'fatherName': fatherName,
         'motherId': motherId,
@@ -121,6 +136,11 @@ class RoosterService {
         'color': color,
         'combType': combType,
         'legColor': legColor,
+        'salePrice': salePrice,
+        'showInShowcase': showInShowcase ?? false,
+        'saleDate': null,
+        'buyerName': null,
+        'saleNotes': null,
       };
       await _roostersCollection(galleraId).add(roosterData);
     } catch (e) {
@@ -152,6 +172,11 @@ class RoosterService {
     String? color,
     String? combType,
     String? legColor,
+    double? salePrice,
+    DateTime? saleDate,
+    String? buyerName,
+    String? saleNotes,
+    bool? showInShowcase,
   }) async {
     if (currentUserId == null) throw Exception("Usuario no autenticado.");
     String imageUrl = existingImageUrl ?? '';
@@ -171,6 +196,7 @@ class RoosterService {
         'status': status,
         'birthDate': Timestamp.fromDate(birthDate),
         'imageUrl': imageUrl,
+        'lastUpdate': FieldValue.serverTimestamp(),
         'fatherId': fatherId,
         'fatherName': fatherName,
         'motherId': motherId,
@@ -181,7 +207,15 @@ class RoosterService {
         'color': color,
         'combType': combType,
         'legColor': legColor,
+        'salePrice': salePrice,
+        'saleDate': saleDate != null ? Timestamp.fromDate(saleDate) : null,
+        'buyerName': buyerName,
+        'saleNotes': saleNotes,
+        'showInShowcase': showInShowcase,
       };
+
+      updatedData.removeWhere((key, value) => value == null);
+
       await _roostersCollection(galleraId).doc(roosterId).update(updatedData);
       if (newImageFile != null &&
           existingImageUrl != null &&
@@ -212,5 +246,30 @@ class RoosterService {
       }
     }
     await _roostersCollection(galleraId).doc(rooster.id).delete();
+  }
+
+  // Obtiene el historial de gallos marcados como "Vendido"
+  Stream<List<RoosterModel>> getSalesHistoryStream(String galleraId) {
+    if (galleraId.isEmpty) return Stream.value([]);
+    return _roostersCollection(galleraId)
+        .where('status', isEqualTo: 'Vendido')
+        .orderBy('saleDate', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => RoosterModel.fromFirestore(doc))
+            .toList());
+  }
+
+  // Obtiene los gallos marcados para mostrar en el escaparate público
+  Stream<List<RoosterModel>> getShowcaseRoostersStream(String galleraId) {
+    if (galleraId.isEmpty) return Stream.value([]);
+    return _roostersCollection(galleraId)
+        .where('status', isEqualTo: 'En Venta')
+        .where('showInShowcase', isEqualTo: true)
+        .orderBy('lastUpdate', descending: true)
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => RoosterModel.fromFirestore(doc))
+            .toList());
   }
 }

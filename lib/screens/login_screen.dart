@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:roozterfaceapp/services/auth_service.dart';
+import 'package:roozterfaceapp/widgets/auth_text_field.dart'; // Usaremos un widget reutilizable
 
 class LoginScreen extends StatefulWidget {
   final void Function()? onTap;
@@ -13,14 +14,10 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // Controladores para los campos de texto
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-
-  // Instancia de nuestro servicio de autenticación
   final AuthService _authService = AuthService();
 
-  // Método para mostrar un pop-up con un mensaje de error
   void showErrorMessage(String message) {
     showDialog(
       context: context,
@@ -38,9 +35,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Método que se ejecuta al presionar el botón de Iniciar Sesión
   void signIn() async {
-    // Mostrar un círculo de carga
+    if (emailController.text.isEmpty || passwordController.text.isEmpty) {
+      showErrorMessage("Por favor, introduce tu email y contraseña.");
+      return;
+    }
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -48,17 +47,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     try {
-      // Llamar al método de inicio de sesión en nuestro servicio
       await _authService.signInWithEmailAndPassword(
         emailController.text,
         passwordController.text,
       );
-
-      // Ocultar círculo de carga si todo sale bien
-      // El AuthGate se encargará de la redirección
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      // Si hay un error, ocultar el círculo de carga y mostrar el mensaje
       Navigator.pop(context);
       showErrorMessage(e.toString().replaceAll("Exception: ", ""));
     }
@@ -70,7 +64,6 @@ class _LoginScreenState extends State<LoginScreen> {
       backgroundColor: Colors.grey[300],
       body: SafeArea(
         child: Center(
-          // SingleChildScrollView previene que el teclado tape los campos de texto
           child: SingleChildScrollView(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 25.0),
@@ -93,72 +86,43 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 35),
-
-                  // Campo de texto para el Email
-                  TextField(
+                  AuthTextField(
                     controller: emailController,
-                    keyboardType: TextInputType
-                        .emailAddress, // Teclado optimizado para email
-                    decoration: InputDecoration(
-                      enabledBorder: const OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey.shade400),
-                      ),
-                      fillColor: Colors.grey.shade200,
-                      filled: true,
-                      hintText: 'Email',
-                      hintStyle: TextStyle(color: Colors.grey[500]),
-                    ),
+                    hintText: 'Email',
+                    keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 10),
-
-                  // Campo de texto para la Contraseña
-                  TextField(
+                  AuthTextField(
                     controller: passwordController,
+                    hintText: 'Contraseña',
                     obscureText: true,
-                    keyboardType: TextInputType
-                        .visiblePassword, // Teclado para contraseñas
-                    decoration: InputDecoration(
-                      enabledBorder: const OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.grey.shade400),
-                      ),
-                      fillColor: Colors.grey.shade200,
-                      filled: true,
-                      hintText: 'Contraseña',
-                      hintStyle: TextStyle(color: Colors.grey[500]),
-                    ),
                   ),
                   const SizedBox(height: 25),
 
-                  // Botón de Iniciar Sesión
-                  GestureDetector(
-                    onTap: signIn, // Llama a nuestro método de lógica
-                    child: Container(
-                      padding: const EdgeInsets.all(25),
-                      decoration: BoxDecoration(
-                        color: Colors.black,
-                        borderRadius: BorderRadius.circular(8),
+                  // --- CORRECCIÓN: Usamos ElevatedButton ---
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: signIn,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.all(25),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
-                      child: const Center(
-                        child: Text(
-                          'Iniciar Sesión',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
+                      child: const Text(
+                        'Iniciar Sesión',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 50),
 
-                  // Enlace para ir a la pantalla de Registro
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

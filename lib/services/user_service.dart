@@ -9,8 +9,8 @@ class UserService {
 
   String? get currentUserId => _auth.currentUser?.uid;
 
-  // Actualiza el ID de la gallera activa en el perfil del usuario.
-  // Esto controla qué gallera ve el usuario en la HomeScreen.
+  /// Actualiza el ID de la gallera activa en el perfil del usuario.
+  /// Esto controla qué gallera ve el usuario en la HomeScreen.
   Future<void> setActiveGallera(String galleraId) async {
     if (currentUserId == null) {
       throw Exception(
@@ -22,7 +22,7 @@ class UserService {
     });
   }
 
-  // Actualiza los datos del perfil del usuario (nombre, dirección, etc.)
+  /// Actualiza los datos del perfil del usuario (nombre, dirección, etc.)
   Future<void> updateUserProfile({
     required String fullName,
     required String mobilePhone,

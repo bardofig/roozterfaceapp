@@ -2,10 +2,10 @@
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:roozterfaceapp/models/user_model.dart';
+import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/services/gallera_service.dart';
-import 'package:roozterfaceapp/services/rooster_service.dart';
-import 'package:roozterfaceapp/utils/string_extensions.dart'; // LA IMPORTACIÓN CLAVE
 
 class GalleraManagementScreen extends StatefulWidget {
   const GalleraManagementScreen({super.key});
@@ -15,40 +15,31 @@ class GalleraManagementScreen extends StatefulWidget {
 }
 
 class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
-  final _galleraNameController = TextEditingController();
   final GalleraService _galleraService = GalleraService();
-  final RoosterService _roosterService = RoosterService();
+  final _galleraNameController = TextEditingController();
   String? _activeGalleraId;
+  UserModel? _currentUserProfile;
   bool _isSavingName = false;
-  late Future<Map<String, dynamic>?> _loadDataFuture;
+
+  Future<List<Map<String, dynamic>>>? _membersFuture;
 
   @override
   void initState() {
     super.initState();
-    _loadDataFuture = _loadInitialData();
+    final userProvider = Provider.of<UserDataProvider>(context, listen: false);
+    _currentUserProfile = userProvider.userProfile;
+    _activeGalleraId = _currentUserProfile?.activeGalleraId;
+
+    if (_activeGalleraId != null) {
+      _loadMembers();
+    }
   }
 
-  Future<Map<String, dynamic>?> _loadInitialData() async {
-    try {
-      final userSnapshot = await _roosterService.getUserProfileStream().first;
-      if (!userSnapshot.exists)
-        throw Exception("Perfil de usuario no encontrado.");
-      final userProfile = UserModel.fromFirestore(userSnapshot);
-      _activeGalleraId = userProfile.activeGalleraId;
-      if (_activeGalleraId == null)
-        throw Exception("El usuario no tiene una gallera activa asignada.");
-      final galleraSnapshot = await _galleraService
-          .getGalleraStream(_activeGalleraId!)
-          .first;
-      if (!galleraSnapshot.exists)
-        throw Exception("No se encontraron los datos de la gallera.");
-      final galleraData = galleraSnapshot.data() as Map<String, dynamic>;
-      _galleraNameController.text = galleraData['name'] ?? 'Sin Nombre';
-      return galleraData;
-    } catch (e) {
-      print("Error cargando datos iniciales de la gallera: $e");
-      throw Exception("No se pudieron cargar los datos de la gallera.");
-    }
+  void _loadMembers() {
+    setState(() {
+      _membersFuture =
+          _galleraService.getMemberDetails(galleraId: _activeGalleraId!);
+    });
   }
 
   @override
@@ -122,12 +113,10 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
                     value: selectedRole,
                     decoration: const InputDecoration(labelText: 'Asignar Rol'),
                     items: roles
-                        .map(
-                          (role) => DropdownMenuItem(
+                        .map((role) => DropdownMenuItem(
                             value: role,
-                            child: Text(role.capitalize()),
-                          ),
-                        )
+                            child: Text(
+                                role[0].toUpperCase() + role.substring(1))))
                         .toList(),
                     onChanged: (value) {
                       setDialogState(() {
@@ -167,17 +156,19 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
       const SnackBar(content: Text('Procesando invitación...')),
     );
     try {
-      final result = await _galleraService.inviteMember(
+      await _galleraService.inviteMember(
         galleraId: _activeGalleraId!,
         invitedEmail: email,
         role: role,
       );
       messenger.showSnackBar(
-        SnackBar(
-          content: Text(result.data['message']),
+        const SnackBar(
+          content: Text("Invitación enviada con éxito."),
           backgroundColor: Colors.green,
         ),
       );
+      // Tras una invitación exitosa, refrescamos la lista.
+      _loadMembers();
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(
@@ -188,128 +179,190 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
     }
   }
 
+  Future<void> _removeMember(String memberId, String memberName) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Eliminar Miembro'),
+        content: Text(
+            '¿Estás seguro de que quieres eliminar a "$memberName" de la gallera? Esta acción no se puede deshacer.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final messenger = ScaffoldMessenger.of(context);
+      try {
+        await _galleraService.removeMember(
+          galleraId: _activeGalleraId!,
+          memberId: memberId,
+        );
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('"$memberName" ha sido eliminado.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Tras eliminar, refrescamos la lista.
+        _loadMembers();
+      } catch (e) {
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('Error al eliminar: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Gestionar Mi Gallera')),
-      body: FutureBuilder<Map<String, dynamic>?>(
-        future: _loadDataFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-            return Center(
-              child: Text(
-                "Error al cargar la información: ${snapshot.error ?? 'No hay datos.'}",
+      body: _activeGalleraId == null
+          ? const Center(child: Text("No hay una gallera activa seleccionada."))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Nombre de la Gallera',
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 16),
+                  _buildGalleraNameEditor(),
+                  const Divider(height: 40),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Miembros',
+                          style: Theme.of(context).textTheme.titleLarge),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.person_add_alt_1),
+                        label: const Text('Invitar'),
+                        onPressed: _showInviteDialog,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  _buildMembersList(),
+                ],
               ),
-            );
-          }
-          final galleraData = snapshot.data!;
-          final Map<String, dynamic> membersMap = galleraData['members'] ?? {};
-          final List<String> memberIds = membersMap.keys.toList();
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Nombre de la Gallera',
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Este es el nombre que verán los miembros que invites.',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _galleraNameController,
-                        decoration: const InputDecoration(
-                          border: OutlineInputBorder(),
-                          labelText: 'Nombre',
-                        ),
-                        textCapitalization: TextCapitalization.words,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _isSavingName
-                        ? const Padding(
-                            padding: EdgeInsets.all(12.0),
-                            child: SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(),
-                            ),
-                          )
-                        : IconButton(
-                            icon: const Icon(Icons.save_outlined),
-                            onPressed: _saveGalleraName,
-                            tooltip: 'Guardar Nombre',
-                          ),
-                  ],
-                ),
-                const Divider(height: 40),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Miembros',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.person_add_alt_1),
-                      label: const Text('Invitar'),
-                      onPressed: _showInviteDialog,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                StreamBuilder<List<UserModel>>(
-                  stream: _galleraService.getMembersProfilesStream(memberIds),
-                  builder: (context, membersSnapshot) {
-                    if (!membersSnapshot.hasData)
-                      return const Center(child: CircularProgressIndicator());
-                    final members = membersSnapshot.data!;
-                    return Card(
-                      child: ListView.builder(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: members.length,
-                        itemBuilder: (context, index) {
-                          final member = members[index];
-                          final role = membersMap[member.uid] ?? 'desconocido';
-                          return ListTile(
-                            leading: const CircleAvatar(
-                              child: Icon(Icons.person_outline),
-                            ),
-                            title: Text(member.fullName),
-                            subtitle: Text(member.email),
-                            trailing: Chip(
-                              label: Text(
-                                role.capitalize(),
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              backgroundColor: role == 'propietario'
-                                  ? Colors.amber.shade200
-                                  : Colors.grey.shade300,
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ],
             ),
-          );
-        },
-      ),
+    );
+  }
+
+  Widget _buildGalleraNameEditor() {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _galleraService.getGalleraStream(_activeGalleraId!),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const TextField(
+              decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  labelText: 'Cargando nombre...'));
+        }
+        if (_galleraNameController.text != (snapshot.data?.get('name') ?? '')) {
+          _galleraNameController.text = snapshot.data?.get('name') ?? '';
+        }
+        return TextField(
+          controller: _galleraNameController,
+          onSubmitted: (_) => _saveGalleraName(),
+          decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              labelText: 'Nombre',
+              suffixIcon: _isSavingName
+                  ? const Padding(
+                      padding: EdgeInsets.all(12.0),
+                      child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2)))
+                  : IconButton(
+                      icon: const Icon(Icons.save_outlined),
+                      onPressed: _saveGalleraName)),
+          textCapitalization: TextCapitalization.words,
+        );
+      },
+    );
+  }
+
+  Widget _buildMembersList() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _membersFuture,
+      builder: (context, membersSnapshot) {
+        if (membersSnapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (membersSnapshot.hasError) {
+          return Center(
+              child:
+                  Text("Error al cargar miembros: ${membersSnapshot.error}"));
+        }
+
+        final members = membersSnapshot.data ?? [];
+        if (members.isEmpty) {
+          return const Center(child: Text("No hay miembros en esta gallera."));
+        }
+
+        members.sort((a, b) {
+          if (a['roleInGallera'] == 'propietario') return -1;
+          if (b['roleInGallera'] == 'propietario') return 1;
+          return (a['fullName'] ?? '').compareTo(b['fullName'] ?? '');
+        });
+
+        return Card(
+          child: ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: members.length,
+            itemBuilder: (context, index) {
+              final member = members[index];
+              final String role = member['roleInGallera'] ?? 'desconocido';
+              final String memberId = member['uid'];
+              final String memberName = member['fullName'] ?? 'Sin Nombre';
+              final bool isOwner = memberId == _currentUserProfile?.uid;
+
+              return ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.person_outline)),
+                title: Text(memberName),
+                subtitle: Text(member['email'] ?? 'Sin Email'),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Chip(
+                      label: Text(
+                        role[0].toUpperCase() + role.substring(1),
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      backgroundColor: isOwner
+                          ? Colors.amber.shade200
+                          : Colors.grey.shade300,
+                    ),
+                    if (!isOwner)
+                      IconButton(
+                        icon: Icon(Icons.delete_outline,
+                            color: Colors.red.shade400),
+                        tooltip: 'Eliminar miembro',
+                        onPressed: () => _removeMember(memberId, memberName),
+                      ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

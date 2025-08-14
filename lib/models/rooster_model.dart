@@ -24,10 +24,12 @@ class RoosterModel {
   final String? combType;
   final String? legColor;
 
-  // --- ¡NUEVOS CAMPOS PARA VENTAS! ---
-  final double? salePrice; // Precio de venta
-  final Timestamp? saleDate; // Fecha de venta
+  // --- ¡NUEVOS CAMPOS PARA VENTAS Y ESCAPARATE! ---
+  final double? salePrice; // Precio de venta establecido
+  final Timestamp? saleDate; // Fecha en la que se concretó la venta
   final String? buyerName; // Nombre del comprador
+  final String? saleNotes; // Notas sobre la venta
+  final bool? showInShowcase; // (Élite) ¿Se muestra en el escaparate público?
 
   RoosterModel({
     required this.id,
@@ -50,6 +52,8 @@ class RoosterModel {
     this.salePrice,
     this.saleDate,
     this.buyerName,
+    this.saleNotes,
+    this.showInShowcase,
   });
 
   factory RoosterModel.fromFirestore(DocumentSnapshot doc) {
@@ -76,23 +80,34 @@ class RoosterModel {
       salePrice: (data['salePrice'] as num?)?.toDouble(),
       saleDate: data['saleDate'],
       buyerName: data['buyerName'],
+      saleNotes: data['saleNotes'],
+      showInShowcase: data['showInShowcase'],
     );
   }
 
-  // Método para convertir los datos a un mapa para guardarlos en Firestore
   Map<String, dynamic> toMap() {
     return {
-      'name': name, 'plate': plate, 'status': status,
-      'birthDate': birthDate, 'imageUrl': imageUrl,
-      'fatherId': fatherId, 'fatherName': fatherName,
-      'motherId': motherId, 'motherName': motherName,
+      'name': name,
+      'plate': plate,
+      'status': status,
+      'birthDate': birthDate,
+      'imageUrl': imageUrl,
+      'fatherId': fatherId,
+      'fatherName': fatherName,
+      'motherId': motherId,
+      'motherName': motherName,
       'fatherLineageText': fatherLineageText,
       'motherLineageText': motherLineageText,
-      'breedLine': breedLine, 'color': color,
-      'combType': combType, 'legColor': legColor,
-      'salePrice': salePrice, 'saleDate': saleDate, 'buyerName': buyerName,
-      'createdAt':
-          FieldValue.serverTimestamp(), // Aseguramos que este campo se mantenga
+      'breedLine': breedLine,
+      'color': color,
+      'combType': combType,
+      'legColor': legColor,
+      'salePrice': salePrice,
+      'saleDate': saleDate,
+      'buyerName': buyerName,
+      'saleNotes': saleNotes,
+      'showInShowcase': showInShowcase,
+      'lastUpdate': FieldValue.serverTimestamp(),
     };
   }
 }

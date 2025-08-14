@@ -5,13 +5,23 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
 import 'package:roozterfaceapp/models/user_model.dart';
+import 'package:roozterfaceapp/providers/rooster_list_provider.dart';
+import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
+import 'package:roozterfaceapp/screens/breeding_list_screen.dart';
+import 'package:roozterfaceapp/screens/chat_list_screen.dart';
 import 'package:roozterfaceapp/screens/gallera_management_screen.dart';
 import 'package:roozterfaceapp/screens/gallera_switcher_screen.dart';
+import 'package:roozterfaceapp/screens/invitations_screen.dart';
+import 'package:roozterfaceapp/screens/marketplace_screen.dart';
 import 'package:roozterfaceapp/screens/profile_screen.dart';
+import 'package:roozterfaceapp/screens/public_showcase_screen.dart';
 import 'package:roozterfaceapp/screens/rooster_details_screen.dart';
+import 'package:roozterfaceapp/screens/sales_history_screen.dart';
 import 'package:roozterfaceapp/screens/subscription_screen.dart';
 import 'package:roozterfaceapp/services/auth_service.dart';
+import 'package:roozterfaceapp/services/chat_service.dart';
+import 'package:roozterfaceapp/services/invitation_service.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';
 import 'package:roozterfaceapp/theme/theme_provider.dart';
 import 'package:roozterfaceapp/widgets/rooster_tile.dart';
@@ -26,31 +36,37 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final AuthService _authService = AuthService();
   final RoosterService _roosterService = RoosterService();
+  final InvitationService _invitationService = InvitationService();
+  final ChatService _chatService = ChatService();
 
   void signOut() {
     _authService.signOut();
   }
 
-  void addRooster(String currentUserPlan, String activeGalleraId) {
+  void addRooster(BuildContext context) {
+    final userProvider = Provider.of<UserDataProvider>(context, listen: false);
+    final userProfile = userProvider.userProfile;
+
+    if (userProfile == null || userProfile.activeGalleraId == null) return;
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => AddRoosterScreen(
-          currentUserPlan: currentUserPlan,
-          activeGalleraId: activeGalleraId,
+          currentUserPlan: userProfile.plan,
+          activeGalleraId: userProfile.activeGalleraId!,
         ),
         fullscreenDialog: true,
       ),
     );
   }
 
-  void goToRoosterDetails(RoosterModel rooster, String activeGalleraId) {
+  void goToRoosterDetails(BuildContext context, RoosterModel rooster) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => RoosterDetailsScreen(
           rooster: rooster,
-          activeGalleraId: activeGalleraId,
         ),
       ),
     );
@@ -89,9 +105,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<bool> _deleteRooster(
-    RoosterModel rooster,
-    String activeGalleraId,
-  ) async {
+      BuildContext context, RoosterModel rooster) async {
+    final activeGalleraId =
+        Provider.of<UserDataProvider>(context, listen: false)
+            .userProfile
+            ?.activeGalleraId;
+    if (activeGalleraId == null) return false;
+
     try {
       await _roosterService.deleteRooster(
         galleraId: activeGalleraId,
@@ -113,157 +133,272 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<bool> _confirmDelete(
+      BuildContext context, RoosterModel rooster) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Confirmar Borrado"),
+          content: Text(
+              "¿Estás seguro de que quieres borrar a \"${rooster.name}\"?"),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("Cancelar"),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("Borrar"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      return await _deleteRooster(context, rooster);
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: StreamBuilder<DocumentSnapshot?>(
-        stream: _roosterService.getUserProfileStream(),
-        builder: (context, userSnapshot) {
-          if (userSnapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (!userSnapshot.hasData ||
-              userSnapshot.data == null ||
-              !userSnapshot.data!.exists) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
+    return Consumer2<UserDataProvider, RoosterListProvider>(
+      builder: (context, userProvider, roosterProvider, child) {
+        if (userProvider.isLoading || roosterProvider.isLoading) {
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
+        }
 
-          final userProfile = UserModel.fromFirestore(userSnapshot.data!);
-          final String? activeGalleraId = userProfile.activeGalleraId;
-          final isPlanIniciacion = userProfile.plan == 'iniciacion';
-          final bool isEliteUser = userProfile.plan == 'elite';
+        if (userProvider.userProfile == null) {
+          return const Scaffold(
+              body: Center(child: Text("Cargando perfil...")));
+        }
 
+        final userProfile = userProvider.userProfile!;
+        final activeGalleraId = userProfile.activeGalleraId;
+        final roosters = roosterProvider.roosters;
+        final isPlanIniciacion = userProfile.plan == 'iniciacion';
+        final canAddRooster = !isPlanIniciacion || roosters.length < 15;
+
+        if (activeGalleraId == null || activeGalleraId.isEmpty) {
           return Scaffold(
             appBar: AppBar(title: const Text('Mis Gallos')),
-            drawer: _buildDrawer(userProfile, isEliteUser),
-            // El FAB ahora está aquí, fuera del StreamBuilder de gallos
-            floatingActionButton: activeGalleraId != null
-                ? StreamBuilder<List<RoosterModel>>(
-                    stream: _roosterService.getRoostersStream(activeGalleraId),
-                    builder: (context, roosterSnapshot) {
-                      final roosterCount = roosterSnapshot.data?.length ?? 0;
-                      final canAddRooster =
-                          !isPlanIniciacion || roosterCount < 15;
-                      return FloatingActionButton(
-                        onPressed: () {
-                          if (canAddRooster) {
-                            addRooster(userProfile.plan, activeGalleraId);
-                          } else {
-                            _showLimitDialog();
-                          }
-                        },
-                        backgroundColor: canAddRooster
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.grey,
-                        child: Icon(
-                          Icons.add,
-                          color: Theme.of(context).colorScheme.onPrimary,
-                        ),
-                      );
-                    },
-                  )
-                : null,
-            body: activeGalleraId == null || activeGalleraId.isEmpty
-                ? const Center(child: Text("No tienes una gallera asignada."))
-                : StreamBuilder<List<RoosterModel>>(
-                    stream: _roosterService.getRoostersStream(activeGalleraId),
-                    builder: (context, roosterSnapshot) {
-                      if (roosterSnapshot.hasError) {
-                        return Center(
-                          child: Text(
-                            "Error al cargar gallos: ${roosterSnapshot.error}",
-                          ),
-                        );
-                      }
-                      if (!roosterSnapshot.hasData) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-
-                      final roosters = roosterSnapshot.data!;
-
-                      if (roosters.isEmpty) {
-                        return const Center(
-                          child: Text(
-                            "No tienes gallos registrados.\n¡Añade el primero!",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 18, color: Colors.grey),
-                          ),
-                        );
-                      }
-
-                      return ListView.builder(
-                        itemCount: roosters.length,
-                        itemBuilder: (context, index) {
-                          final rooster = roosters[index];
-                          return Dismissible(
-                            key: Key(rooster.id),
-                            direction: DismissDirection.endToStart,
-                            background: Container(
-                              color: Colors.red,
-                              alignment: Alignment.centerRight,
-                              padding: const EdgeInsets.only(right: 20.0),
-                              child: const Icon(
-                                Icons.delete,
-                                color: Colors.white,
-                              ),
-                            ),
-                            confirmDismiss: (direction) async {
-                              bool? confirm = await showDialog<bool>(
-                                context: context,
-                                builder: (BuildContext context) {
-                                  return AlertDialog(
-                                    title: const Text("Confirmar Borrado"),
-                                    content: Text(
-                                      "¿Estás seguro de que quieres borrar a \"${rooster.name}\"?",
-                                    ),
-                                    actions: <Widget>[
-                                      TextButton(
-                                        onPressed: () =>
-                                            Navigator.of(context).pop(false),
-                                        child: const Text("Cancelar"),
-                                      ),
-                                      TextButton(
-                                        style: TextButton.styleFrom(
-                                          foregroundColor: Colors.red,
-                                        ),
-                                        onPressed: () =>
-                                            Navigator.of(context).pop(true),
-                                        child: const Text("Borrar"),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              );
-                              if (confirm != true) return false;
-                              return await _deleteRooster(
-                                rooster,
-                                activeGalleraId,
-                              );
-                            },
-                            child: RoosterTile(
-                              name: rooster.name,
-                              plate: rooster.plate,
-                              status: rooster.status,
-                              imageUrl: rooster.imageUrl,
-                              onTap: () =>
-                                  goToRoosterDetails(rooster, activeGalleraId),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  ),
+            drawer: _buildDrawer(context, userProfile),
+            body: _buildWelcomeMessage(),
           );
-        },
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Mis Gallos'),
+            actions: [
+              _buildInvitationsButton(),
+              _buildChatButton(),
+            ],
+          ),
+          drawer: _buildDrawer(context, userProfile),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              if (canAddRooster) {
+                addRooster(context);
+              } else {
+                _showLimitDialog();
+              }
+            },
+            backgroundColor: canAddRooster
+                ? Theme.of(context).colorScheme.primary
+                : Colors.grey,
+            child:
+                Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
+          ),
+          body: _buildBody(context, roosters),
+        );
+      },
+    );
+  }
+
+  Widget _buildBody(BuildContext context, List<RoosterModel> roosters) {
+    if (roosters.isEmpty) {
+      return const Center(
+        child: Text(
+          "No tienes gallos registrados.\n¡Añade el primero!",
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, color: Colors.grey),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      itemCount: roosters.length,
+      itemBuilder: (context, index) {
+        final rooster = roosters[index];
+        return Dismissible(
+          key: Key(rooster.id),
+          direction: DismissDirection.endToStart,
+          background: Container(
+            color: Colors.red,
+            alignment: Alignment.centerRight,
+            padding: const EdgeInsets.only(right: 20.0),
+            child: const Icon(Icons.delete, color: Colors.white),
+          ),
+          confirmDismiss: (direction) => _confirmDelete(context, rooster),
+          child: RoosterTile(
+            rooster: rooster,
+            onTap: () => goToRoosterDetails(context, rooster),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInvitationsButton() {
+    return StreamBuilder<DocumentSnapshot?>(
+      stream: _invitationService.getInvitationsStream(),
+      builder: (context, snapshot) {
+        bool hasInvites = false;
+        if (snapshot.hasData &&
+            snapshot.data != null &&
+            snapshot.data!.exists) {
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          final Map<String, dynamic> pendingInvites =
+              data['pending_invitations'] ?? {};
+          if (pendingInvites.isNotEmpty) {
+            hasInvites = true;
+          }
+        }
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined),
+              tooltip: 'Mis Invitaciones',
+              onPressed: () {
+                Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const InvitationsScreen()));
+              },
+            ),
+            if (hasInvites)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration:
+                      BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildChatButton() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _chatService.getChatListStream(),
+      builder: (context, snapshot) {
+        bool hasUnread = false;
+        if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+          final currentUser =
+              Provider.of<UserDataProvider>(context, listen: false).userProfile;
+          if (currentUser != null) {
+            for (var doc in snapshot.data!.docs) {
+              final data = doc.data() as Map<String, dynamic>;
+              final Timestamp? lastMessageTimestamp =
+                  data['lastMessageTimestamp'];
+              final String lastSenderId = data['lastMessageSenderId'] ?? '';
+              final Map<String, dynamic> lastReadByMap =
+                  data['lastMessageReadBy'] ?? {};
+              final Timestamp? myLastReadTimestamp =
+                  lastReadByMap[currentUser.uid];
+
+              if (lastSenderId != currentUser.uid &&
+                  lastMessageTimestamp != null) {
+                if (myLastReadTimestamp == null ||
+                    lastMessageTimestamp.compareTo(myLastReadTimestamp) > 0) {
+                  hasUnread = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline),
+              tooltip: 'Mis Conversaciones',
+              onPressed: () {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const ChatListScreen()));
+              },
+            ),
+            if (hasUnread)
+              Positioned(
+                right: 8,
+                top: 8,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration:
+                      BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildWelcomeMessage() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              "Bienvenido a tu Gallera Digital.",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            const Text(
+              "Parece que no tienes una gallera activa o no perteneces a ninguna.",
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.swap_horiz),
+              label: const Text("Seleccionar o Crear Gallera"),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const GalleraSwitcherScreen(),
+                  ),
+                );
+              },
+            )
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildDrawer(UserModel userProfile, bool isEliteUser) {
+  Widget _buildDrawer(BuildContext context, UserModel userProfile) {
+    final bool isMaestroOrHigher =
+        userProfile.plan == 'maestro' || userProfile.plan == 'elite';
+    final bool isEliteUser = userProfile.plan == 'elite';
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -273,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: DrawerHeader(
               padding: const EdgeInsets.all(8.0),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.background,
+                color: Theme.of(context).colorScheme.surface,
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(12.0),
@@ -303,7 +438,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               shadows: [
-                                Shadow(blurRadius: 3, color: Colors.black),
+                                Shadow(blurRadius: 3, color: Colors.black)
                               ],
                             ),
                           ),
@@ -314,7 +449,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: Colors.white70,
                               fontSize: 14,
                               shadows: [
-                                Shadow(blurRadius: 2, color: Colors.black),
+                                Shadow(blurRadius: 2, color: Colors.black)
                               ],
                             ),
                           ),
@@ -350,6 +485,63 @@ class _HomeScreenState extends State<HomeScreen> {
               );
             },
           ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.shopping_basket_outlined),
+            title: const Text('Mercado de Ejemplares'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const MarketplaceScreen(),
+                ),
+              );
+            },
+          ),
+          const Divider(),
+          if (isMaestroOrHigher)
+            ListTile(
+              leading: const Icon(Icons.auto_stories),
+              title: const Text('Libro de Cría'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BreedingListScreen(),
+                  ),
+                );
+              },
+            ),
+          if (isMaestroOrHigher)
+            ListTile(
+              leading: const Icon(Icons.monetization_on_outlined),
+              title: const Text('Registro de Ventas'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SalesHistoryScreen(),
+                  ),
+                );
+              },
+            ),
+          if (isEliteUser)
+            ListTile(
+              leading: const Icon(Icons.storefront_outlined),
+              title: const Text('Mi Escaparate Público'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PublicShowcaseScreen(),
+                  ),
+                );
+              },
+            ),
           if (isEliteUser)
             ListTile(
               leading: const Icon(Icons.groups_outlined),
@@ -359,7 +551,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => GalleraManagementScreen(),
+                    builder: (context) => const GalleraManagementScreen(),
                   ),
                 );
               },
@@ -386,15 +578,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             title: const Text('Tema Oscuro'),
             trailing: Switch(
-              value: Provider.of<ThemeProvider>(
-                context,
-                listen: false,
-              ).isDarkMode,
+              value:
+                  Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
               onChanged: (value) {
-                Provider.of<ThemeProvider>(
-                  context,
-                  listen: false,
-                ).toggleTheme();
+                Provider.of<ThemeProvider>(context, listen: false)
+                    .toggleTheme();
               },
             ),
           ),

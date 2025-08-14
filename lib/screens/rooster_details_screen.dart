@@ -1,15 +1,14 @@
 // lib/screens/rooster_details_screen.dart
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:roozterfaceapp/models/fight_model.dart';
 import 'package:roozterfaceapp/models/health_log_model.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
-import 'package:roozterfaceapp/models/user_model.dart';
+import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/screens/add_fight_screen.dart';
 import 'package:roozterfaceapp/screens/add_health_log_screen.dart';
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
@@ -19,18 +18,15 @@ import 'package:roozterfaceapp/screens/pedigree_screen.dart';
 import 'package:roozterfaceapp/services/analytics_service.dart';
 import 'package:roozterfaceapp/services/fight_service.dart';
 import 'package:roozterfaceapp/services/health_service.dart';
-import 'package:roozterfaceapp/services/rooster_service.dart';
 import 'package:roozterfaceapp/widgets/fight_tile.dart';
 import 'package:roozterfaceapp/widgets/health_log_tile.dart';
 
 class RoosterDetailsScreen extends StatefulWidget {
   final RoosterModel rooster;
-  final String activeGalleraId;
 
   const RoosterDetailsScreen({
     super.key,
     required this.rooster,
-    required this.activeGalleraId,
   });
 
   @override
@@ -40,7 +36,6 @@ class RoosterDetailsScreen extends StatefulWidget {
 class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     with SingleTickerProviderStateMixin {
   TabController? _tabController;
-  final RoosterService _roosterService = RoosterService();
   final FightService _fightService = FightService();
   final HealthService _healthService = HealthService();
   final AnalyticsService _analyticsService = AnalyticsService();
@@ -51,87 +46,16 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     super.dispose();
   }
 
-  void _goToEditScreen(String currentUserPlan) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddRoosterScreen(
-          roosterToEdit: widget.rooster,
-          currentUserPlan: currentUserPlan,
-          activeGalleraId: widget.activeGalleraId,
-        ),
-      ),
-    );
-  }
+  Future<bool> _deleteFight(BuildContext context, FightModel fight) async {
+    final activeGalleraId =
+        Provider.of<UserDataProvider>(context, listen: false)
+            .userProfile
+            ?.activeGalleraId;
+    if (activeGalleraId == null) return false;
 
-  void _goToAddFightScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddFightScreen(
-          galleraId: widget.activeGalleraId,
-          roosterId: widget.rooster.id,
-        ),
-        fullscreenDialog: true,
-      ),
-    );
-  }
-
-  void _goToFightDetails(FightModel fight) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => FightDetailsScreen(
-          galleraId: widget.activeGalleraId,
-          roosterId: widget.rooster.id,
-          fight: fight,
-        ),
-      ),
-    );
-  }
-
-  void _goToAddHealthLogScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddHealthLogScreen(
-          galleraId: widget.activeGalleraId,
-          roosterId: widget.rooster.id,
-        ),
-        fullscreenDialog: true,
-      ),
-    );
-  }
-
-  void _goToHealthLogDetails(HealthLogModel log) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => HealthLogDetailsScreen(
-          galleraId: widget.activeGalleraId,
-          roosterId: widget.rooster.id,
-          log: log,
-        ),
-      ),
-    );
-  }
-
-  void _goToPedigreeScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PedigreeScreen(
-          initialRooster: widget.rooster,
-          galleraId: widget.activeGalleraId,
-        ),
-      ),
-    );
-  }
-
-  Future<bool> _deleteFight(FightModel fight) async {
     try {
       await _fightService.deleteFight(
-        galleraId: widget.activeGalleraId,
+        galleraId: activeGalleraId,
         roosterId: widget.rooster.id,
         fightId: fight.id,
       );
@@ -151,122 +75,224 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: StreamBuilder<DocumentSnapshot>(
-        stream: _roosterService.getUserProfileStream(),
-        builder: (context, userSnapshot) {
-          if (!userSnapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final userProfile = UserModel.fromFirestore(userSnapshot.data!);
-          final bool isMaestroOrHigher =
-              userProfile.plan == 'maestro' || userProfile.plan == 'elite';
-          final bool isEliteUser = userProfile.plan == 'elite';
+  void _goToEditScreen(BuildContext context) {
+    final userProvider = Provider.of<UserDataProvider>(context, listen: false);
+    final userProfile = userProvider.userProfile;
+    if (userProfile?.activeGalleraId == null) return;
 
-          int tabCount = 1;
-          if (isMaestroOrHigher) tabCount = 3;
-          if (isEliteUser) tabCount = 4;
-
-          if (_tabController == null || _tabController!.length != tabCount) {
-            _tabController?.dispose();
-            _tabController = TabController(length: tabCount, vsync: this);
-          }
-          return NestedScrollView(
-            headerSliverBuilder: (context, innerBoxIsScrolled) {
-              return [
-                SliverAppBar(
-                  expandedHeight: 250.0,
-                  floating: false,
-                  pinned: true,
-                  backgroundColor: Theme.of(
-                    context,
-                  ).appBarTheme.backgroundColor,
-                  foregroundColor: Theme.of(
-                    context,
-                  ).appBarTheme.foregroundColor,
-                  actions: [
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () => _goToEditScreen(userProfile.plan),
-                    ),
-                  ],
-                  flexibleSpace: FlexibleSpaceBar(
-                    centerTitle: true,
-                    title: Text(
-                      widget.rooster.name,
-                      style: const TextStyle(
-                        fontSize: 16.0,
-                        color: Colors.white,
-                        shadows: [Shadow(blurRadius: 4, color: Colors.black)],
-                      ),
-                    ),
-                    background: widget.rooster.imageUrl.isNotEmpty
-                        ? CachedNetworkImage(
-                            imageUrl: widget.rooster.imageUrl,
-                            fit: BoxFit.cover,
-                            placeholder: (c, u) =>
-                                Container(color: Colors.grey[300]),
-                            errorWidget: (c, u, e) =>
-                                const Icon(Icons.broken_image),
-                          )
-                        : Container(
-                            color: Colors.grey[300],
-                            child: const Center(
-                              child: Icon(
-                                Icons.shield_outlined,
-                                size: 100,
-                                color: Colors.grey,
-                              ),
-                            ),
-                          ),
-                  ),
-                  bottom: PreferredSize(
-                    preferredSize: const Size.fromHeight(kToolbarHeight),
-                    child: Container(
-                      color: Theme.of(context).appBarTheme.backgroundColor,
-                      child: TabBar(
-                        controller: _tabController,
-                        isScrollable: tabCount > 3,
-                        tabs: [
-                          const Tab(text: 'General'),
-                          if (isMaestroOrHigher) const Tab(text: 'Combates'),
-                          if (isMaestroOrHigher) const Tab(text: 'Salud'),
-                          if (isEliteUser) const Tab(text: 'Analítica'),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ];
-            },
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildGeneralInfoTab(isEliteUser),
-                if (isMaestroOrHigher) _buildFightsTab(),
-                if (isMaestroOrHigher) _buildHealthTab(),
-                if (isEliteUser) _buildAnalyticsTab(),
-              ],
-            ),
-          );
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddRoosterScreen(
+          roosterToEdit: widget.rooster,
+          currentUserPlan: userProfile!.plan,
+          activeGalleraId: userProfile.activeGalleraId!,
+        ),
       ),
     );
   }
 
-  Widget _buildGeneralInfoTab(bool isEliteUser) {
-    final DateFormat formatter = DateFormat('dd de MMMM de yyyy', 'es_ES');
-    final String formattedBirthDate = formatter.format(
-      widget.rooster.birthDate.toDate(),
+  void _goToAddFightScreen(BuildContext context) {
+    final activeGalleraId =
+        Provider.of<UserDataProvider>(context, listen: false)
+            .userProfile
+            ?.activeGalleraId;
+    if (activeGalleraId == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddFightScreen(
+          galleraId: activeGalleraId,
+          roosterId: widget.rooster.id,
+        ),
+        fullscreenDialog: true,
+      ),
     );
-    final String fatherDisplay =
-        widget.rooster.fatherName ??
+  }
+
+  void _goToFightDetails(BuildContext context, FightModel fight) {
+    final activeGalleraId =
+        Provider.of<UserDataProvider>(context, listen: false)
+            .userProfile
+            ?.activeGalleraId;
+    if (activeGalleraId == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FightDetailsScreen(
+          galleraId: activeGalleraId,
+          roosterId: widget.rooster.id,
+          fight: fight,
+        ),
+      ),
+    );
+  }
+
+  void _goToAddHealthLogScreen(BuildContext context) {
+    final activeGalleraId =
+        Provider.of<UserDataProvider>(context, listen: false)
+            .userProfile
+            ?.activeGalleraId;
+    if (activeGalleraId == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddHealthLogScreen(
+          galleraId: activeGalleraId,
+          roosterId: widget.rooster.id,
+        ),
+        fullscreenDialog: true,
+      ),
+    );
+  }
+
+  void _goToHealthLogDetails(BuildContext context, HealthLogModel log) {
+    final activeGalleraId =
+        Provider.of<UserDataProvider>(context, listen: false)
+            .userProfile
+            ?.activeGalleraId;
+    if (activeGalleraId == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HealthLogDetailsScreen(
+          galleraId: activeGalleraId,
+          roosterId: widget.rooster.id,
+          log: log,
+        ),
+      ),
+    );
+  }
+
+  void _goToPedigreeScreen(BuildContext context) {
+    final activeGalleraId =
+        Provider.of<UserDataProvider>(context, listen: false)
+            .userProfile
+            ?.activeGalleraId;
+    if (activeGalleraId == null) return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PedigreeScreen(
+          initialRooster: widget.rooster,
+          galleraId: activeGalleraId,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userProvider = Provider.of<UserDataProvider>(context);
+    final userProfile = userProvider.userProfile;
+
+    if (userProfile == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final bool isMaestroOrHigher =
+        userProfile.plan == 'maestro' || userProfile.plan == 'elite';
+    final bool isEliteUser = userProfile.plan == 'elite';
+    final String activeGalleraId = userProfile.activeGalleraId ?? '';
+
+    int tabCount = 1; // General
+    if (isMaestroOrHigher) tabCount++; // Combates
+    if (isMaestroOrHigher) tabCount++; // Salud
+    if (isEliteUser) tabCount++; // Analítica
+
+    if (_tabController == null || _tabController!.length != tabCount) {
+      _tabController?.dispose();
+      _tabController = TabController(length: tabCount, vsync: this);
+    }
+
+    return Scaffold(
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverAppBar(
+              expandedHeight: 250.0,
+              floating: false,
+              pinned: true,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.edit),
+                  onPressed: () => _goToEditScreen(context),
+                ),
+              ],
+              flexibleSpace: FlexibleSpaceBar(
+                centerTitle: true,
+                title: Text(
+                  widget.rooster.name,
+                  style: const TextStyle(
+                    fontSize: 16.0,
+                    color: Colors.white,
+                    shadows: [Shadow(blurRadius: 4, color: Colors.black)],
+                  ),
+                ),
+                background: Hero(
+                  tag: widget.rooster.id,
+                  child: widget.rooster.imageUrl.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: widget.rooster.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (c, u) =>
+                              Container(color: Colors.grey[300]),
+                          errorWidget: (c, u, e) =>
+                              const Icon(Icons.broken_image),
+                        )
+                      : Container(
+                          color: Colors.grey[300],
+                          child: const Center(
+                              child: Icon(Icons.shield_outlined,
+                                  size: 100, color: Colors.grey)),
+                        ),
+                ),
+              ),
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(kToolbarHeight),
+                child: Container(
+                  color: Theme.of(context).appBarTheme.backgroundColor,
+                  child: TabBar(
+                    controller: _tabController,
+                    isScrollable: tabCount > 2,
+                    tabs: [
+                      const Tab(text: 'General'),
+                      if (isMaestroOrHigher) const Tab(text: 'Combates'),
+                      if (isMaestroOrHigher) const Tab(text: 'Salud'),
+                      if (isEliteUser) const Tab(text: 'Analítica'),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ];
+        },
+        body: TabBarView(
+          controller: _tabController,
+          children: [
+            _buildGeneralInfoTab(context, isEliteUser),
+            if (isMaestroOrHigher) _buildFightsTab(context, activeGalleraId),
+            if (isMaestroOrHigher) _buildHealthTab(context, activeGalleraId),
+            if (isEliteUser) _buildAnalyticsTab(context, activeGalleraId),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGeneralInfoTab(BuildContext context, bool isEliteUser) {
+    final DateFormat formatter = DateFormat('dd de MMMM de yyyy', 'es_ES');
+    final String formattedBirthDate =
+        formatter.format(widget.rooster.birthDate.toDate());
+    final String fatherDisplay = widget.rooster.fatherName ??
         widget.rooster.fatherLineageText ??
         'No registrado';
-    final String motherDisplay =
-        widget.rooster.motherName ??
+    final String motherDisplay = widget.rooster.motherName ??
         widget.rooster.motherLineageText ??
         'No registrada';
 
@@ -275,55 +301,44 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildDetailRow(
-            icon: Icons.badge,
-            label: 'Placa',
-            value: widget.rooster.plate.isNotEmpty
-                ? widget.rooster.plate
-                : 'N/A',
-          ),
+          _buildDetailRow(context,
+              icon: Icons.badge,
+              label: 'Placa',
+              value: widget.rooster.plate.isNotEmpty
+                  ? widget.rooster.plate
+                  : 'N/A'),
           const Divider(),
-          _buildDetailRow(
-            icon: Icons.cake,
-            label: 'Nacimiento',
-            value: formattedBirthDate,
-          ),
+          _buildDetailRow(context,
+              icon: Icons.cake, label: 'Nacimiento', value: formattedBirthDate),
           const Divider(),
-          _buildDetailRow(
-            icon: Icons.monitor_heart,
-            label: 'Estado',
-            value: widget.rooster.status,
-          ),
+          _buildDetailRow(context,
+              icon: Icons.monitor_heart,
+              label: 'Estado',
+              value: widget.rooster.status),
           const Divider(),
           const SizedBox(height: 16),
-          Text(
-            "Características",
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text("Características",
+              style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
-          _buildDetailRow(
-            icon: Icons.shield,
-            label: 'Línea / Casta',
-            value: widget.rooster.breedLine ?? 'No registrada',
-          ),
+          _buildDetailRow(context,
+              icon: Icons.shield,
+              label: 'Línea / Casta',
+              value: widget.rooster.breedLine ?? 'No registrada'),
           const Divider(),
-          _buildDetailRow(
-            icon: Icons.palette,
-            label: 'Color',
-            value: widget.rooster.color ?? 'No registrado',
-          ),
+          _buildDetailRow(context,
+              icon: Icons.palette,
+              label: 'Color',
+              value: widget.rooster.color ?? 'No registrado'),
           const Divider(),
-          _buildDetailRow(
-            icon: Icons.content_cut,
-            label: 'Tipo de Cresta',
-            value: widget.rooster.combType ?? 'No registrado',
-          ),
+          _buildDetailRow(context,
+              icon: Icons.content_cut,
+              label: 'Tipo de Cresta',
+              value: widget.rooster.combType ?? 'No registrado'),
           const Divider(),
-          _buildDetailRow(
-            icon: Icons.square_foot,
-            label: 'Color de Patas',
-            value: widget.rooster.legColor ?? 'No registrado',
-          ),
+          _buildDetailRow(context,
+              icon: Icons.square_foot,
+              label: 'Color de Patas',
+              value: widget.rooster.legColor ?? 'No registrado'),
           const Divider(),
           const SizedBox(height: 16),
           Row(
@@ -334,59 +349,51 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                 TextButton.icon(
                   icon: const Icon(Icons.account_tree),
                   label: const Text("Ver Árbol"),
-                  onPressed: _goToPedigreeScreen,
+                  onPressed: () => _goToPedigreeScreen(context),
                 ),
             ],
           ),
           const SizedBox(height: 8),
-          _buildDetailRow(
-            icon: Icons.male,
-            label: 'Línea Paterna',
-            value: fatherDisplay,
-          ),
+          _buildDetailRow(context,
+              icon: Icons.male, label: 'Línea Paterna', value: fatherDisplay),
           const Divider(),
-          _buildDetailRow(
-            icon: Icons.female,
-            label: 'Línea Materna',
-            value: motherDisplay,
-          ),
+          _buildDetailRow(context,
+              icon: Icons.female, label: 'Línea Materna', value: motherDisplay),
         ],
       ),
     );
   }
 
-  Widget _buildFightsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          Align(
+  Widget _buildFightsTab(BuildContext context, String activeGalleraId) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               icon: const Icon(Icons.add_circle),
               label: const Text("Programar Combate"),
-              onPressed: _goToAddFightScreen,
+              onPressed: () => _goToAddFightScreen(context),
             ),
           ),
-          StreamBuilder<List<FightModel>>(
+        ),
+        Expanded(
+          child: StreamBuilder<List<FightModel>>(
             stream: _fightService.getFightsStream(
-              widget.activeGalleraId,
-              widget.rooster.id,
-            ),
+                activeGalleraId, widget.rooster.id),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const CircularProgressIndicator();
+                return const Center(child: CircularProgressIndicator());
               }
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24.0),
-                  child: Text("No hay eventos registrados."),
-                );
+                    padding: EdgeInsets.symmetric(vertical: 24.0),
+                    child: Text("No hay eventos registrados."));
               }
               final fights = snapshot.data!;
               return ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(8),
                 itemCount: fights.length,
                 itemBuilder: (context, index) {
                   final fight = fights[index];
@@ -394,132 +401,116 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                     key: Key(fight.id),
                     direction: DismissDirection.endToStart,
                     background: Container(
-                      color: Colors.red,
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.only(right: 20.0),
-                      child: const Icon(Icons.delete, color: Colors.white),
-                    ),
+                        color: Colors.red,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20.0),
+                        child: const Icon(Icons.delete, color: Colors.white)),
                     confirmDismiss: (direction) async {
                       bool? confirm = await showDialog<bool>(
                         context: context,
                         builder: (c) => AlertDialog(
                           title: const Text("Confirmar Borrado"),
                           content: const Text(
-                            "¿Estás seguro de que quieres borrar este evento de combate?",
-                          ),
+                              "¿Estás seguro de que quieres borrar este evento de combate?"),
                           actions: [
                             TextButton(
-                              onPressed: () => Navigator.of(c).pop(false),
-                              child: const Text("Cancelar"),
-                            ),
+                                onPressed: () => Navigator.of(c).pop(false),
+                                child: const Text("Cancelar")),
                             TextButton(
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.red,
-                              ),
-                              onPressed: () => Navigator.of(c).pop(true),
-                              child: const Text("Borrar"),
-                            ),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                ),
+                                onPressed: () => Navigator.of(c).pop(true),
+                                child: const Text("Borrar")),
                           ],
                         ),
                       );
                       if (confirm != true) return false;
-                      return await _deleteFight(fight);
+                      return await _deleteFight(context, fight);
                     },
                     child: FightTile(
-                      fight: fight,
-                      onTap: () => _goToFightDetails(fight),
-                    ),
+                        fight: fight,
+                        onTap: () => _goToFightDetails(context, fight)),
                   );
                 },
               );
             },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildHealthTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        children: [
-          Align(
+  Widget _buildHealthTab(BuildContext context, String activeGalleraId) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               icon: const Icon(Icons.add_circle),
               label: const Text("Añadir Registro"),
-              onPressed: _goToAddHealthLogScreen,
+              onPressed: () => _goToAddHealthLogScreen(context),
             ),
           ),
-          StreamBuilder<List<HealthLogModel>>(
+        ),
+        Expanded(
+          child: StreamBuilder<List<HealthLogModel>>(
             stream: _healthService.getHealthLogsStream(
-              widget.activeGalleraId,
-              widget.rooster.id,
-            ),
+                activeGalleraId, widget.rooster.id),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const CircularProgressIndicator();
+                return const Center(child: CircularProgressIndicator());
               }
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24.0),
-                  child: Text("No hay registros de salud."),
-                );
+                    padding: EdgeInsets.symmetric(vertical: 24.0),
+                    child: Text("No hay registros de salud."));
               }
               final logs = snapshot.data!;
               return ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(8),
                 itemCount: logs.length,
                 itemBuilder: (context, index) {
                   final log = logs[index];
                   return HealthLogTile(
-                    log: log,
-                    onTap: () => _goToHealthLogDetails(log),
-                  );
+                      log: log,
+                      onTap: () => _goToHealthLogDetails(context, log));
                 },
               );
             },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
-  Widget _buildAnalyticsTab() {
+  Widget _buildAnalyticsTab(BuildContext context, String activeGalleraId) {
     return StreamBuilder<List<FightModel>>(
-      stream: _fightService.getFightsStream(
-        widget.activeGalleraId,
-        widget.rooster.id,
-      ),
+      stream: _fightService.getFightsStream(activeGalleraId, widget.rooster.id),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(
-            child: Text("No hay datos de combate para generar analíticas."),
-          );
+              child: Text("No hay datos de combate para generar analíticas."));
         }
 
-        final analytics = _analyticsService.calculateFightAnalytics(
-          snapshot.data!,
-        );
+        final analytics =
+            _analyticsService.calculateFightAnalytics(snapshot.data!);
         if (analytics.totalFights == 0) {
           return const Center(
-            child: Text("Aún no hay combates completados para analizar."),
-          );
+              child: Text("Aún no hay combates completados para analizar."));
         }
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              Text(
-                "Rendimiento General",
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
+              Text("Rendimiento General",
+                  style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 24),
               SizedBox(
                 height: 200,
@@ -528,37 +519,31 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                     sections: [
                       if (analytics.wins > 0)
                         PieChartSectionData(
-                          value: analytics.wins.toDouble(),
-                          title: '${analytics.wins}V',
-                          color: Colors.green,
-                          radius: 80,
-                          titleStyle: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                            value: analytics.wins.toDouble(),
+                            title: '${analytics.wins}V',
+                            color: Colors.green,
+                            radius: 80,
+                            titleStyle: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
                       if (analytics.losses > 0)
                         PieChartSectionData(
-                          value: analytics.losses.toDouble(),
-                          title: '${analytics.losses}D',
-                          color: Colors.red,
-                          radius: 80,
-                          titleStyle: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                            value: analytics.losses.toDouble(),
+                            title: '${analytics.losses}D',
+                            color: Colors.red,
+                            radius: 80,
+                            titleStyle: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
                       if (analytics.draws > 0)
                         PieChartSectionData(
-                          value: analytics.draws.toDouble(),
-                          title: '${analytics.draws}T',
-                          color: Colors.orange,
-                          radius: 80,
-                          titleStyle: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                            value: analytics.draws.toDouble(),
+                            title: '${analytics.draws}T',
+                            color: Colors.orange,
+                            radius: 80,
+                            titleStyle: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white)),
                     ],
                     centerSpaceRadius: 40,
                     sectionsSpace: 2,
@@ -571,15 +556,11 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     children: [
-                      _buildAnalyticsRow(
-                        "Total de Combates:",
-                        analytics.totalFights.toString(),
-                      ),
+                      _buildAnalyticsRow("Total de Combates:",
+                          analytics.totalFights.toString()),
                       const Divider(),
-                      _buildAnalyticsRow(
-                        "Porcentaje de Victorias:",
-                        "${analytics.winRate.toStringAsFixed(1)}%",
-                      ),
+                      _buildAnalyticsRow("Porcentaje de Victorias:",
+                          "${analytics.winRate.toStringAsFixed(1)}%"),
                     ],
                   ),
                 ),
@@ -598,31 +579,27 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontSize: 16)),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
+          Text(value,
+              style:
+                  const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         ],
       ),
     );
   }
 
-  Widget _buildDetailRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
+  Widget _buildDetailRow(BuildContext context,
+      {required IconData icon, required String label, required String value}) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: Colors.grey[600], size: 20),
+          Icon(icon, color: theme.colorScheme.secondary, size: 20),
           const SizedBox(width: 16),
           Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
           Expanded(
-            child: Text(value, textAlign: TextAlign.right, softWrap: true),
-          ),
+              child: Text(value, textAlign: TextAlign.right, softWrap: true)),
         ],
       ),
     );

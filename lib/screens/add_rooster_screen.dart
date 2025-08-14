@@ -15,11 +15,21 @@ class AddRoosterScreen extends StatefulWidget {
   final String currentUserPlan;
   final String activeGalleraId;
 
+  // Parámetros opcionales para pre-rellenar el linaje
+  final String? initialFatherId;
+  final String? initialMotherId;
+  final String? initialFatherLineage;
+  final String? initialMotherLineage;
+
   const AddRoosterScreen({
     super.key,
     this.roosterToEdit,
     required this.currentUserPlan,
     required this.activeGalleraId,
+    this.initialFatherId,
+    this.initialMotherId,
+    this.initialFatherLineage,
+    this.initialMotherLineage,
   });
 
   @override
@@ -27,26 +37,21 @@ class AddRoosterScreen extends StatefulWidget {
 }
 
 class _AddRoosterScreenState extends State<AddRoosterScreen> {
-  final _scrollController = ScrollController();
   final _formKey = GlobalKey<FormState>();
-  static const _formPageStorageKey = PageStorageKey('addRoosterForm');
-
-  // Controladores
+  // Controladores Generales
   final _nameController = TextEditingController();
   final _plateController = TextEditingController();
   final _fatherLineageController = TextEditingController();
   final _motherLineageController = TextEditingController();
+  // Controladores de Venta
+  final _salePriceController = TextEditingController();
+  final _buyerNameController = TextEditingController();
+  final _saleNotesController = TextEditingController();
 
-  // Variables de Estado
+  // Estados Generales
   DateTime? _selectedDate;
   String? _selectedStatus;
-  final List<String> _statuses = [
-    'Activo',
-    'En Venta',
-    'Descansando',
-    'Herido',
-    'Perdido en Combate',
-  ];
+  late List<String> _statuses;
   File? _selectedImage;
   final RoosterService _roosterService = RoosterService();
   bool _isSaving = false;
@@ -57,12 +62,31 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
   String? _selectedCombType;
   String? _selectedLegColor;
   BreedProfile? _selectedBreedProfile;
+  // Estados de Venta
+  DateTime? _saleDate;
+  bool _showInShowcase = false;
+
+  Future<List<RoosterModel>>? _parentsFuture;
 
   @override
   void initState() {
     super.initState();
+    _parentsFuture =
+        _roosterService.getRoostersStream(widget.activeGalleraId).first;
+    _statuses = [
+      'Activo',
+      'En Venta',
+      'Descansando',
+      'Herido',
+      'Perdido en Combate'
+    ];
+
     if (widget.roosterToEdit != null) {
+      // Modo Edición
       final rooster = widget.roosterToEdit!;
+      if (rooster.status == 'Vendido' && !_statuses.contains('Vendido')) {
+        _statuses.add('Vendido');
+      }
       _nameController.text = rooster.name;
       _plateController.text = rooster.plate;
       _selectedDate = rooster.birthDate.toDate();
@@ -75,52 +99,69 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
       _selectedColor = rooster.color;
       _selectedCombType = rooster.combType;
       _selectedLegColor = rooster.legColor;
+      _salePriceController.text = rooster.salePrice?.toStringAsFixed(2) ?? '';
+      _buyerNameController.text = rooster.buyerName ?? '';
+      _saleNotesController.text = rooster.saleNotes ?? '';
+      _saleDate = rooster.saleDate?.toDate();
+      _showInShowcase = rooster.showInShowcase ?? false;
       _updateBreedProfile();
     } else {
+      // Modo Creación
       _selectedStatus = 'Activo';
+      if (widget.initialFatherId != null)
+        _selectedFatherId = widget.initialFatherId;
+      if (widget.initialFatherLineage != null)
+        _fatherLineageController.text = widget.initialFatherLineage!;
+      if (widget.initialMotherId != null)
+        _selectedMotherId = widget.initialMotherId;
+      if (widget.initialMotherLineage != null)
+        _motherLineageController.text = widget.initialMotherLineage!;
     }
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
     _nameController.dispose();
     _plateController.dispose();
     _fatherLineageController.dispose();
     _motherLineageController.dispose();
+    _salePriceController.dispose();
+    _buyerNameController.dispose();
+    _saleNotesController.dispose();
     super.dispose();
   }
 
   void _updateBreedProfile() {
     if (_selectedBreedLine != null) {
       try {
-        setState(() {
-          _selectedBreedProfile = breedProfiles.firstWhere(
-            (p) => p.name == _selectedBreedLine,
-          );
-        });
+        setState(() => _selectedBreedProfile =
+            breedProfiles.firstWhere((p) => p.name == _selectedBreedLine));
       } catch (e) {
-        setState(() {
-          _selectedBreedProfile = null;
-        });
+        setState(() => _selectedBreedProfile = null);
       }
     } else {
-      setState(() {
-        _selectedBreedProfile = null;
-      });
+      setState(() => _selectedBreedProfile = null);
     }
   }
 
-  Future<void> _selectDate(BuildContext context) async {
+  Future<void> _selectDate(BuildContext context,
+      {bool isSaleDate = false}) async {
+    final initial = isSaleDate
+        ? (_saleDate ?? DateTime.now())
+        : (_selectedDate ?? DateTime.now());
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
+      initialDate: initial,
       firstDate: DateTime(2000),
       lastDate: DateTime.now(),
     );
-    if (picked != null && picked != _selectedDate) {
+    if (picked != null) {
       setState(() {
-        _selectedDate = picked;
+        if (isSaleDate) {
+          _saleDate = picked;
+        } else {
+          _selectedDate = picked;
+        }
       });
     }
   }
@@ -157,10 +198,8 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
 
   Future<void> _getImage(ImageSource source) async {
     final ImagePicker picker = ImagePicker();
-    final XFile? pickedFile = await picker.pickImage(
-      source: source,
-      imageQuality: 80,
-    );
+    final XFile? pickedFile =
+        await picker.pickImage(source: source, imageQuality: 80);
     if (pickedFile != null) {
       setState(() {
         _selectedImage = File(pickedFile.path);
@@ -169,46 +208,41 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
   }
 
   Future<void> _saveRooster(List<RoosterModel> allRoosters) async {
-    if (_nameController.text.isEmpty || _selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El Nombre y la Fecha son obligatorios.')),
-      );
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('La fecha de nacimiento es obligatoria.')));
       return;
     }
     if (widget.roosterToEdit == null && _selectedImage == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Por favor, selecciona una imagen.')),
-      );
+          const SnackBar(content: Text('Por favor, selecciona una imagen.')));
       return;
     }
+
     setState(() {
       _isSaving = true;
     });
 
     final fatherData = _selectedFatherId != null
-        ? allRoosters.firstWhere(
-            (r) => r.id == _selectedFatherId,
+        ? allRoosters.firstWhere((r) => r.id == _selectedFatherId,
             orElse: () => RoosterModel(
-              id: '',
-              name: '',
-              plate: '',
-              status: '',
-              birthDate: Timestamp.now(),
-            ),
-          )
+                id: '',
+                name: '',
+                plate: '',
+                status: '',
+                birthDate: Timestamp.now()))
         : null;
     final motherData = _selectedMotherId != null
-        ? allRoosters.firstWhere(
-            (r) => r.id == _selectedMotherId,
+        ? allRoosters.firstWhere((r) => r.id == _selectedMotherId,
             orElse: () => RoosterModel(
-              id: '',
-              name: '',
-              plate: '',
-              status: '',
-              birthDate: Timestamp.now(),
-            ),
-          )
+                id: '',
+                name: '',
+                plate: '',
+                status: '',
+                birthDate: Timestamp.now()))
         : null;
+    final double? salePrice = double.tryParse(_salePriceController.text);
 
     try {
       if (widget.roosterToEdit != null) {
@@ -231,6 +265,11 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
           color: _selectedColor,
           combType: _selectedCombType,
           legColor: _selectedLegColor,
+          salePrice: salePrice,
+          saleDate: _saleDate,
+          buyerName: _buyerNameController.text,
+          saleNotes: _saleNotesController.text,
+          showInShowcase: _showInShowcase,
         );
       } else {
         await _roosterService.addNewRooster(
@@ -250,86 +289,77 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
           color: _selectedColor,
           combType: _selectedCombType,
           legColor: _selectedLegColor,
+          salePrice: salePrice,
+          showInShowcase: _showInShowcase,
         );
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('¡Gallo guardado con éxito!')),
-        );
+            const SnackBar(content: Text('¡Gallo guardado con éxito!')));
         Navigator.of(context).pop();
-        if (widget.roosterToEdit != null) {
-          Navigator.of(context).pop();
-        }
+        if (widget.roosterToEdit != null) Navigator.of(context).pop();
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al guardar: ${e.toString()}')),
-        );
-      }
+            SnackBar(content: Text('Error al guardar: ${e.toString()}')));
     } finally {
-      if (mounted) {
+      if (mounted)
         setState(() {
           _isSaving = false;
         });
-      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isEditing = widget.roosterToEdit != null;
     final bool isMaestroOrHigher = widget.currentUserPlan != 'iniciacion';
+    final bool isEliteUser = widget.currentUserPlan == 'elite';
+
+    bool showSalePriceField =
+        _selectedStatus == 'En Venta' || _selectedStatus == 'Vendido';
+    bool showSoldFields = _selectedStatus == 'Vendido';
+    bool showShowcaseSwitch = _selectedStatus == 'En Venta' && isEliteUser;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEditing ? 'Editar Gallo' : 'Añadir Nuevo Gallo'),
+        title: Text(widget.roosterToEdit != null
+            ? 'Editar Gallo'
+            : 'Añadir Nuevo Gallo'),
       ),
-      body: StreamBuilder<List<RoosterModel>>(
-        stream: _roosterService.getRoostersStream(widget.activeGalleraId),
+      body: FutureBuilder<List<RoosterModel>>(
+        future: _parentsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text("Error: ${snapshot.error}"));
+            return Center(
+                child: Text("Error al cargar datos: ${snapshot.error}"));
           }
+
           final allRoosters = snapshot.data ?? [];
-
-          final List<String> breedingStatuses = ['activo', 'descansando'];
-          final possibleParents = allRoosters.where((r) {
-            final isNotSelf = isEditing
-                ? r.id != widget.roosterToEdit!.id
-                : true;
-            final isBreedable = breedingStatuses.contains(
-              r.status.toLowerCase(),
-            );
-            return isNotSelf && isBreedable;
-          }).toList();
-
-          final dropdownItems = possibleParents
-              .map(
-                (rooster) => DropdownMenuItem<String>(
-                  value: rooster.id,
-                  child: Text("${rooster.name} (${rooster.plate})"),
-                ),
-              )
+          final possibleParents = allRoosters
+              .where((r) =>
+                  (widget.roosterToEdit == null ||
+                      r.id != widget.roosterToEdit!.id) &&
+                  ['activo', 'descansando'].contains(r.status.toLowerCase()))
               .toList();
-
-          final validFatherId =
-              _selectedFatherId != null &&
+          final dropdownItems = possibleParents
+              .map((rooster) => DropdownMenuItem<String>(
+                  value: rooster.id,
+                  child: Text("${rooster.name} (${rooster.plate})")))
+              .toList();
+          final validFatherId = _selectedFatherId != null &&
                   possibleParents.any((p) => p.id == _selectedFatherId)
               ? _selectedFatherId
               : null;
-          final validMotherId =
-              _selectedMotherId != null &&
+          final validMotherId = _selectedMotherId != null &&
                   possibleParents.any((p) => p.id == _selectedMotherId)
               ? _selectedMotherId
               : null;
 
           return SingleChildScrollView(
-            key: _formPageStorageKey,
-            controller: _scrollController,
             padding: const EdgeInsets.all(16.0),
             child: Form(
               key: _formKey,
@@ -345,96 +375,70 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                           backgroundColor: Colors.grey.shade300,
                           backgroundImage: _selectedImage != null
                               ? FileImage(_selectedImage!)
-                              : (isEditing &&
-                                            widget
-                                                .roosterToEdit!
-                                                .imageUrl
-                                                .isNotEmpty
-                                        ? NetworkImage(
-                                            widget.roosterToEdit!.imageUrl,
-                                          )
-                                        : null)
-                                    as ImageProvider?,
-                          child:
-                              (_selectedImage == null &&
-                                  !(isEditing &&
+                              : (widget.roosterToEdit != null &&
+                                      widget.roosterToEdit!.imageUrl.isNotEmpty
+                                  ? NetworkImage(widget.roosterToEdit!.imageUrl)
+                                  : null) as ImageProvider?,
+                          child: (_selectedImage == null &&
+                                  !(widget.roosterToEdit != null &&
                                       widget
-                                          .roosterToEdit!
-                                          .imageUrl
-                                          .isNotEmpty))
-                              ? Icon(
-                                  Icons.camera_alt,
-                                  size: 50,
-                                  color: Colors.grey.shade700,
-                                )
+                                          .roosterToEdit!.imageUrl.isNotEmpty))
+                              ? Icon(Icons.camera_alt,
+                                  size: 50, color: Colors.grey.shade700)
                               : null,
                         ),
                         IconButton(
                           icon: const CircleAvatar(
-                            radius: 20,
-                            backgroundColor: Colors.black,
-                            child: Icon(
-                              Icons.edit,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                          ),
+                              radius: 20,
+                              backgroundColor: Colors.black,
+                              child: Icon(Icons.edit,
+                                  color: Colors.white, size: 20)),
                           onPressed: _pickImage,
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(height: 24),
-
-                  Text(
-                    "Datos del Ejemplar",
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
+                  Text("Datos del Ejemplar",
+                      style: Theme.of(context).textTheme.titleLarge),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Nombre del Gallo *',
-                    ),
-                    textCapitalization: TextCapitalization.words,
-                  ),
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                          labelText: 'Nombre del Gallo *'),
+                      textCapitalization: TextCapitalization.words,
+                      validator: (v) =>
+                          v!.isEmpty ? 'El nombre es obligatorio' : null),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: _plateController,
-                    decoration: const InputDecoration(
-                      labelText: 'Placa / Anillo',
-                    ),
-                  ),
+                      controller: _plateController,
+                      decoration:
+                          const InputDecoration(labelText: 'Placa / Anillo')),
                   const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
+                  Row(children: [
+                    Expanded(
                         child: Text(
-                          _selectedDate == null
-                              ? 'Fecha de Nacimiento *'
-                              : 'Nacimiento: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)}',
-                          style: const TextStyle(fontSize: 16),
-                        ),
-                      ),
-                      TextButton(
+                            _selectedDate == null
+                                ? 'Fecha de Nacimiento *'
+                                : 'Nacimiento: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)}',
+                            style: const TextStyle(fontSize: 16))),
+                    TextButton(
                         onPressed: () => _selectDate(context),
-                        child: const Text('Seleccionar'),
-                      ),
-                    ],
-                  ),
+                        child: const Text('Seleccionar'))
+                  ]),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
                     value: _selectedStatus,
                     decoration: const InputDecoration(labelText: 'Estado'),
-                    items: _statuses.map((String status) {
-                      return DropdownMenuItem<String>(
-                        value: status,
-                        child: Text(status),
-                      );
-                    }).toList(),
+                    items: _statuses
+                        .map((s) =>
+                            DropdownMenuItem<String>(value: s, child: Text(s)))
+                        .toList(),
                     onChanged: (newValue) {
                       setState(() {
                         _selectedStatus = newValue;
+                        if (newValue == 'Vendido' && _saleDate == null)
+                          _saleDate = DateTime.now();
                       });
                     },
                   ),
@@ -442,16 +446,11 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                   DropdownButtonFormField<String>(
                     value: _selectedBreedLine,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Línea / Casta',
-                    ),
+                    decoration:
+                        const InputDecoration(labelText: 'Línea / Casta'),
                     items: breedProfiles
-                        .map(
-                          (BreedProfile profile) => DropdownMenuItem<String>(
-                            value: profile.name,
-                            child: Text(profile.name),
-                          ),
-                        )
+                        .map((BreedProfile profile) => DropdownMenuItem<String>(
+                            value: profile.name, child: Text(profile.name)))
                         .toList(),
                     onChanged: (newValue) {
                       setState(() {
@@ -466,16 +465,11 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                   DropdownButtonFormField<String>(
                     value: _selectedColor,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Color de Plumaje',
-                    ),
+                    decoration:
+                        const InputDecoration(labelText: 'Color de Plumaje'),
                     items: plumageColorOptions
-                        .map(
-                          (String color) => DropdownMenuItem<String>(
-                            value: color,
-                            child: Text(color),
-                          ),
-                        )
+                        .map((String color) => DropdownMenuItem<String>(
+                            value: color, child: Text(color)))
                         .toList(),
                     onChanged: (newValue) {
                       setState(() {
@@ -487,16 +481,11 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                   DropdownButtonFormField<String>(
                     value: _selectedCombType,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Tipo de Cresta',
-                    ),
+                    decoration:
+                        const InputDecoration(labelText: 'Tipo de Cresta'),
                     items: combTypeOptions
-                        .map(
-                          (String type) => DropdownMenuItem<String>(
-                            value: type,
-                            child: Text(type),
-                          ),
-                        )
+                        .map((String type) => DropdownMenuItem<String>(
+                            value: type, child: Text(type)))
                         .toList(),
                     onChanged: (newValue) {
                       setState(() {
@@ -508,16 +497,11 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                   DropdownButtonFormField<String>(
                     value: _selectedLegColor,
                     isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Color de Patas',
-                    ),
+                    decoration:
+                        const InputDecoration(labelText: 'Color de Patas'),
                     items: legColorOptions
-                        .map(
-                          (String color) => DropdownMenuItem<String>(
-                            value: color,
-                            child: Text(color),
-                          ),
-                        )
+                        .map((String color) => DropdownMenuItem<String>(
+                            value: color, child: Text(color)))
                         .toList(),
                     onChanged: (newValue) {
                       setState(() {
@@ -526,88 +510,131 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                     },
                   ),
 
+                  // --- SECCIÓN DE VENTAS DINÁMICA ---
+                  if (isMaestroOrHigher && showSalePriceField)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Divider(height: 32),
+                        Text("Detalles de Venta (Plan Maestro)",
+                            style: Theme.of(context).textTheme.titleLarge),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                            controller: _salePriceController,
+                            decoration: const InputDecoration(
+                                labelText: 'Precio de Venta (\$)',
+                                prefixText: '\$ '),
+                            keyboardType: const TextInputType.numberWithOptions(
+                                decimal: true)),
+                      ],
+                    ),
+
+                  if (showShowcaseSwitch)
+                    SwitchListTile(
+                      title:
+                          const Text('Mostrar en Escaparate Público (Élite)'),
+                      value: _showInShowcase,
+                      onChanged: (value) =>
+                          setState(() => _showInShowcase = value),
+                    ),
+
+                  if (isMaestroOrHigher && showSoldFields)
+                    Column(
+                      children: [
+                        const SizedBox(height: 16),
+                        TextFormField(
+                            controller: _buyerNameController,
+                            decoration: const InputDecoration(
+                                labelText: 'Nombre del Comprador'),
+                            textCapitalization: TextCapitalization.words),
+                        const SizedBox(height: 16),
+                        Row(children: [
+                          Expanded(
+                              child: Text(
+                                  'Fecha de Venta: ${DateFormat('dd/MM/yyyy').format(_saleDate!)}')),
+                          TextButton(
+                              onPressed: () =>
+                                  _selectDate(context, isSaleDate: true),
+                              child: const Text('Cambiar'))
+                        ]),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                            controller: _saleNotesController,
+                            decoration: const InputDecoration(
+                                labelText: 'Notas de la Venta'),
+                            maxLines: 2,
+                            textCapitalization: TextCapitalization.sentences),
+                      ],
+                    ),
+
                   if (isMaestroOrHigher)
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Divider(height: 32),
-                        Text(
-                          "Linaje (Plan Maestro Criador)",
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
+                        Text("Linaje (Plan Maestro Criador)",
+                            style: Theme.of(context).textTheme.titleLarge),
                         const SizedBox(height: 16),
                         DropdownButtonFormField<String>(
                           value: validFatherId,
                           decoration: const InputDecoration(
-                            labelText: 'Padre (Semental Registrado)',
-                          ),
+                              labelText: 'Padre (Semental Registrado)'),
                           items: dropdownItems,
                           onChanged: (newValue) {
                             setState(() {
                               _selectedFatherId = newValue;
-                              if (newValue != null) {
+                              if (newValue != null)
                                 _fatherLineageController.clear();
-                              }
                             });
                           },
                           isExpanded: true,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
-                          controller: _fatherLineageController,
-                          decoration: InputDecoration(
-                            labelText: 'Línea Paterna (si no está registrado)',
-                            enabled: _selectedFatherId == null,
-                          ),
-                          textCapitalization: TextCapitalization.words,
-                        ),
+                            controller: _fatherLineageController,
+                            decoration: InputDecoration(
+                                labelText:
+                                    'Línea Paterna (si no está registrado)',
+                                enabled: _selectedFatherId == null),
+                            textCapitalization: TextCapitalization.words),
                         const SizedBox(height: 24),
                         DropdownButtonFormField<String>(
                           value: validMotherId,
                           decoration: const InputDecoration(
-                            labelText: 'Madre (Gallina Registrada)',
-                          ),
+                              labelText: 'Madre (Gallina Registrada)'),
                           items: dropdownItems,
                           onChanged: (newValue) {
                             setState(() {
                               _selectedMotherId = newValue;
-                              if (newValue != null) {
+                              if (newValue != null)
                                 _motherLineageController.clear();
-                              }
                             });
                           },
                           isExpanded: true,
                         ),
                         const SizedBox(height: 16),
                         TextFormField(
-                          controller: _motherLineageController,
-                          decoration: InputDecoration(
-                            labelText: 'Línea Materna (si no está registrada)',
-                            enabled: _selectedMotherId == null,
-                          ),
-                          textCapitalization: TextCapitalization.words,
-                        ),
+                            controller: _motherLineageController,
+                            decoration: InputDecoration(
+                                labelText:
+                                    'Línea Materna (si no está registrada)',
+                                enabled: _selectedMotherId == null),
+                            textCapitalization: TextCapitalization.words),
                       ],
                     ),
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
-                      onPressed: _isSaving
-                          ? null
-                          : () => _saveRooster(allRoosters),
+                      onPressed:
+                          _isSaving ? null : () => _saveRooster(allRoosters),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        foregroundColor: Theme.of(
-                          context,
-                        ).colorScheme.onPrimary,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
+                          padding: const EdgeInsets.symmetric(vertical: 16)),
                       child: _isSaving
                           ? const CircularProgressIndicator()
-                          : Text(
-                              isEditing ? 'Guardar Cambios' : 'Guardar Gallo',
-                            ),
+                          : Text(widget.roosterToEdit != null
+                              ? 'Guardar Cambios'
+                              : 'Guardar Gallo'),
                     ),
                   ),
                 ],
@@ -624,18 +651,15 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
       margin: const EdgeInsets.only(top: 12.0),
       padding: const EdgeInsets.all(12.0),
       decoration: BoxDecoration(
-        color: Colors.blueGrey.shade50,
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.blueGrey.shade100),
+        border: Border.all(color: Theme.of(context).dividerColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildInfoRow(
-            Icons.sports_kabaddi,
-            "Estilo de Pelea:",
-            profile.fightingStyle,
-          ),
+              Icons.sports_kabaddi, "Estilo de Pelea:", profile.fightingStyle),
           const SizedBox(height: 8),
           _buildInfoRow(Icons.biotech, "Notas de Cría:", profile.breedingNotes),
         ],
@@ -647,19 +671,17 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: Colors.blueGrey),
+        Icon(icon, size: 16, color: Theme.of(context).colorScheme.secondary),
         const SizedBox(width: 8),
         Expanded(
           child: Text.rich(
             TextSpan(
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
               children: [
                 TextSpan(
-                  text: '$title ',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                  ),
-                ),
+                    text: '$title ',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 12)),
                 TextSpan(text: content, style: const TextStyle(fontSize: 12)),
               ],
             ),

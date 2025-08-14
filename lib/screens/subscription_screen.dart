@@ -2,6 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:provider/provider.dart';
+import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/services/payment_service.dart';
 
 class SubscriptionScreen extends StatefulWidget {
@@ -15,7 +17,6 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   final PaymentService _paymentService = PaymentService();
   bool _isLoadingProducts = true;
   List<ProductDetails> _products = [];
-  final String _currentUserPlan = 'iniciacion';
 
   @override
   void initState() {
@@ -36,25 +37,29 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   void _onPurchaseStatusChanged() {
     final status = _paymentService.purchaseStatusNotifier.value;
+    final messenger = ScaffoldMessenger.of(context);
 
     if (status == PurchaseProcessStatus.completed) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('¡Suscripción activada con éxito!'),
           backgroundColor: Colors.green,
         ),
       );
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          Navigator.of(context).pop();
-        }
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) Navigator.of(context).pop();
       });
-    } else if (status == PurchaseProcessStatus.error) {
-      ScaffoldMessenger.of(context).showSnackBar(
+    } else if (status == PurchaseProcessStatus.restored) {
+      messenger.showSnackBar(
         const SnackBar(
-          content: Text(
-            'Ocurrió un error al procesar la compra. Inténtalo de nuevo.',
-          ),
+          content: Text('¡Suscripción restaurada con éxito!'),
+          backgroundColor: Colors.blue,
+        ),
+      );
+    } else if (status == PurchaseProcessStatus.error) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Ocurrió un error. Por favor, inténtalo de nuevo.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -62,6 +67,9 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
   }
 
   Future<void> _loadProducts() async {
+    setState(() {
+      _isLoadingProducts = true;
+    });
     await _paymentService.loadProducts();
     if (mounted) {
       setState(() {
@@ -77,8 +85,29 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Obtenemos el plan actual del usuario desde el provider
+    final currentUserPlan =
+        Provider.of<UserDataProvider>(context).userProfile?.plan ??
+        'iniciacion';
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Planes y Suscripción')),
+      appBar: AppBar(
+        title: const Text('Planes y Suscripción'),
+        actions: [
+          // --- ¡NUEVO BOTÓN DE RESTAURAR! ---
+          TextButton(
+            onPressed: () {
+              _paymentService.restorePurchases();
+            },
+            child: Text(
+              'Restaurar',
+              style: TextStyle(
+                color: Theme.of(context).appBarTheme.foregroundColor,
+              ),
+            ),
+          ),
+        ],
+      ),
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: ValueListenableBuilder<PurchaseProcessStatus>(
         valueListenable: _paymentService.purchaseStatusNotifier,
@@ -93,10 +122,15 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                   ? const Center(child: CircularProgressIndicator())
                   : _products.isEmpty
                   ? const Center(
-                      child: Text('No hay planes disponibles en este momento.'),
+                      child: Padding(
+                        padding: EdgeInsets.all(16.0),
+                        child: Text(
+                          'No hay planes disponibles en este momento. Asegúrate de haber configurado los productos en la Google Play Console.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     )
-                  : _buildPlanList(),
-
+                  : _buildPlanList(currentUserPlan),
               if (isPurchasing)
                 Container(
                   color: Colors.black.withOpacity(0.7),
@@ -126,50 +160,76 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     );
   }
 
-  Widget _buildPlanList() {
-    const Map<String, List<String>> planFeatures = {
-      'maestro_criador_mensual': [
-        'Hasta 150 gallos',
-        'Módulo de Linaje',
-        'Historial de Combate',
-        'Bitácora de Salud',
-      ],
-      'maestro_criador_anual': [
-        'Hasta 150 gallos',
-        'Módulo de Linaje',
-        'Historial de Combate',
-        'Bitácora de Salud',
-      ],
-      'club_elite_mensual': [
-        'Gallos Ilimitados',
-        'Acceso Multiusuario (Próximamente)',
-        'Árbol Genealógico (Próximamente)',
-        'Analítica (Próximamente)',
-      ],
-      'club_elite_anual': [
-        'Gallos Ilimitados',
-        'Acceso Multiusuario (Próximamente)',
-        'Árbol Genealógico (Próximamente)',
-        'Analítica (Próximamente)',
-      ],
+  Widget _buildPlanList(String currentUserPlan) {
+    const Map<String, Map<String, dynamic>> planDetails = {
+      'maestro_criador_mensual': {
+        'name': 'Maestro Criador',
+        'planId': 'maestro',
+        'features': [
+          'Hasta 150 gallos',
+          'Módulo de Linaje',
+          'Historial de Combate',
+          'Bitácora de Salud',
+        ],
+      },
+      'maestro_criador_anual': {
+        'name': 'Maestro Criador',
+        'planId': 'maestro',
+        'features': [
+          'Ahorro del 20% Anual',
+          'Hasta 150 gallos',
+          'Historial de Combate',
+          'Bitácora de Salud',
+        ],
+      },
+      'club_elite_mensual': {
+        'name': 'Club de Élite',
+        'planId': 'elite',
+        'features': [
+          'Gallos Ilimitados',
+          'Acceso Multiusuario',
+          'Árbol Genealógico',
+          'Analítica Avanzada',
+        ],
+      },
+      'club_elite_anual': {
+        'name': 'Club de Élite',
+        'planId': 'elite',
+        'features': [
+          'Ahorro del 25% Anual',
+          'Todo lo de Maestro',
+          'Acceso Multiusuario',
+          'Árbol Genealógico',
+        ],
+      },
     };
 
+    // Ordenamos los productos para una mejor presentación
+    _products.sort((a, b) {
+      final aIsElite = a.id.contains('elite');
+      final bIsElite = b.id.contains('elite');
+      final aIsAnual = a.id.contains('anual');
+      final bIsAnual = b.id.contains('anual');
+
+      if (aIsElite != bIsElite) return aIsElite ? 1 : -1;
+      if (aIsAnual != bIsAnual) return aIsAnual ? 1 : -1;
+      return 0;
+    });
+
     List<Widget> planCards = _products.map((product) {
-      bool isMaestro = product.id.startsWith('maestro_criador');
-      bool isElite = product.id.startsWith('club_elite');
-      String planName = isMaestro
-          ? 'Maestro Criador'
-          : (isElite ? 'Club de Élite' : 'Desconocido');
+      final details = planDetails[product.id];
+      if (details == null) return const SizedBox.shrink();
 
       return Padding(
         padding: const EdgeInsets.only(bottom: 16.0),
         child: _buildPlanCard(
           context,
-          title: planName,
+          title: details['name'],
           price: product.price,
-          features: planFeatures[product.id] ?? [],
-          isCurrentPlan: _currentUserPlan == (isMaestro ? 'maestro' : 'elite'),
-          isRecommended: isMaestro,
+          features: details['features'],
+          isCurrentPlan: currentUserPlan == details['planId'],
+          isRecommended:
+              details['planId'] == 'maestro' && product.id.contains('anual'),
           onTap: () => _handlePurchase(product),
         ),
       );
@@ -188,7 +248,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               'Ficha de datos básicos',
               'Seguimiento de estado',
             ],
-            isCurrentPlan: _currentUserPlan == 'iniciacion',
+            isCurrentPlan: currentUserPlan == 'iniciacion',
             onTap: () {},
           ),
           const SizedBox(height: 16),
@@ -281,11 +341,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    child: Text(
-                      title == 'Maestro Criador'
-                          ? 'Mejorar a Maestro'
-                          : 'Mejorar a Élite',
-                    ),
+                    child: Text('Mejorar Plan'),
                   ),
           ],
         ),

@@ -23,6 +23,8 @@ class _PedigreeScreenState extends State<PedigreeScreen> {
   final RoosterService _roosterService = RoosterService();
   late BuchheimWalkerConfiguration _builderConfig;
 
+  final Map<String, RoosterModel> _roosterDataMap = {};
+
   @override
   void initState() {
     super.initState();
@@ -86,9 +88,7 @@ class _PedigreeScreenState extends State<PedigreeScreen> {
           }
           if (!snapshot.hasData || snapshot.data!.nodeCount() <= 1) {
             return const Center(
-              child: Text(
-                "No hay datos de linaje registrados para generar el árbol.",
-              ),
+              child: Text("No hay datos de linaje para generar el árbol."),
             );
           }
 
@@ -110,25 +110,17 @@ class _PedigreeScreenState extends State<PedigreeScreen> {
                 ..style = PaintingStyle.stroke,
               builder: (Node node) {
                 var roosterId = node.key!.value as String;
-                return FutureBuilder<RoosterModel?>(
-                  future: _roosterService.getRoosterById(
-                    widget.galleraId,
-                    roosterId,
+                final roosterData = _roosterDataMap[roosterId];
+                if (roosterData != null) {
+                  return _buildNodeWidget(roosterData);
+                }
+                return Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade200,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  builder: (context, roosterSnapshot) {
-                    if (roosterSnapshot.hasData &&
-                        roosterSnapshot.data != null) {
-                      return _buildNodeWidget(roosterSnapshot.data!);
-                    }
-                    return Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text('...'),
-                    );
-                  },
+                  child: const Text('Error'),
                 );
               },
             ),
@@ -141,15 +133,17 @@ class _PedigreeScreenState extends State<PedigreeScreen> {
   Future<Graph> _buildPedigreeGraph() async {
     final graph = Graph();
     final nodes = <String, Node>{};
+    final allAncestorIds = <String>{};
 
-    Future<void> addParents(
+    Future<void> collectAncestorIds(
       RoosterModel currentRooster,
       int maxDepth, {
       int currentDepth = 0,
     }) async {
-      if (currentDepth >= maxDepth) return;
-
-      nodes.putIfAbsent(currentRooster.id, () => Node.Id(currentRooster.id));
+      if (currentDepth >= maxDepth ||
+          allAncestorIds.contains(currentRooster.id))
+        return;
+      allAncestorIds.add(currentRooster.id);
 
       if (currentRooster.fatherId != null) {
         final father = await _roosterService.getRoosterById(
@@ -157,38 +151,82 @@ class _PedigreeScreenState extends State<PedigreeScreen> {
           currentRooster.fatherId!,
         );
         if (father != null) {
-          nodes.putIfAbsent(father.id, () => Node.Id(father.id));
-          graph.addEdge(
-            nodes[currentRooster.id]!,
-            nodes[father.id]!,
-            paint: Paint()
-              ..color = Colors.blue
-              ..strokeWidth = 2,
+          await collectAncestorIds(
+            father,
+            maxDepth,
+            currentDepth: currentDepth + 1,
           );
-          await addParents(father, maxDepth, currentDepth: currentDepth + 1);
         }
       }
-
       if (currentRooster.motherId != null) {
         final mother = await _roosterService.getRoosterById(
           widget.galleraId,
           currentRooster.motherId!,
         );
         if (mother != null) {
-          nodes.putIfAbsent(mother.id, () => Node.Id(mother.id));
-          graph.addEdge(
-            nodes[currentRooster.id]!,
-            nodes[mother.id]!,
-            paint: Paint()
-              ..color = Colors.pink
-              ..strokeWidth = 2,
+          await collectAncestorIds(
+            mother,
+            maxDepth,
+            currentDepth: currentDepth + 1,
           );
-          await addParents(mother, maxDepth, currentDepth: currentDepth + 1);
         }
       }
     }
 
-    await addParents(widget.initialRooster, 3);
+    await collectAncestorIds(widget.initialRooster, 3);
+
+    if (allAncestorIds.isNotEmpty) {
+      final roosters = await _roosterService.getRoostersByIds(
+        widget.galleraId,
+        allAncestorIds.toList(),
+      );
+      for (var rooster in roosters) {
+        _roosterDataMap[rooster.id] = rooster;
+      }
+    }
+
+    void buildGraphFromData(
+      RoosterModel currentRooster,
+      int maxDepth, {
+      int currentDepth = 0,
+    }) {
+      if (currentDepth >= maxDepth || nodes.containsKey(currentRooster.id))
+        return;
+      nodes.putIfAbsent(currentRooster.id, () => Node.Id(currentRooster.id));
+
+      if (currentRooster.fatherId != null &&
+          _roosterDataMap.containsKey(currentRooster.fatherId)) {
+        final father = _roosterDataMap[currentRooster.fatherId]!;
+        buildGraphFromData(father, maxDepth, currentDepth: currentDepth + 1);
+        graph.addEdge(
+          nodes[currentRooster.id]!,
+          nodes[father.id]!,
+          paint: Paint()
+            ..color = Colors.blue
+            ..strokeWidth = 2,
+        );
+      }
+
+      if (currentRooster.motherId != null &&
+          _roosterDataMap.containsKey(currentRooster.motherId)) {
+        final mother = _roosterDataMap[currentRooster.motherId]!;
+        buildGraphFromData(mother, maxDepth, currentDepth: currentDepth + 1);
+        // --- CORRECCIÓN CRÍTICA DEL TYPO ---
+        graph.addEdge(
+          nodes[currentRooster.id]!, // La variable correcta
+          nodes[mother.id]!,
+          paint: Paint()
+            ..color = Colors.pink
+            ..strokeWidth = 2,
+        );
+      }
+    }
+
+    // Aseguramos que el gallo inicial esté en el mapa antes de empezar a construir
+    if (_roosterDataMap.containsKey(widget.initialRooster.id)) {
+      buildGraphFromData(widget.initialRooster, 3);
+    }
+
     return graph;
   }
 }
