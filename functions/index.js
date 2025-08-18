@@ -13,19 +13,21 @@ const db = getFirestore();
 const auth = getAuth();
 
 /**
- * Se dispara cuando un documento en cualquier subcolección 'gallos' es escrito.
- * Mantiene la colección raíz 'showcase_listings' sincronizada.
+ * Se dispara cuando un documento de gallo es escrito.
+ * RECONSTRUIDA CON LÓGICA DEFENSIVA CONTRA VALORES `undefined`.
  */
 exports.onRoosterUpdate = onDocumentWritten("galleras/{galleraId}/gallos/{roosterId}", async (event) => {
     const { galleraId, roosterId } = event.params;
     const showcaseRef = db.collection("showcase_listings").doc(roosterId);
 
     if (!event.data.after.exists) {
-        logger.log(`Gallo ${roosterId} eliminado, quitando del escaparate.`);
+        logger.info(`[${roosterId}] Gallo eliminado. Limpiando escaparate.`);
         try {
             await showcaseRef.delete();
         } catch (error) {
-            logger.error("Error al eliminar del escaparate tras borrado:", error);
+            if (error.code !== 5) {
+                logger.error(`[${roosterId}] Error al limpiar escaparate tras eliminación:`, error);
+            }
         }
         return;
     }
@@ -34,54 +36,72 @@ exports.onRoosterUpdate = onDocumentWritten("galleras/{galleraId}/gallos/{rooste
     const isInShowcase = roosterData.status === "En Venta" && roosterData.showInShowcase === true;
 
     if (isInShowcase) {
-        logger.log(`Publicando/Actualizando gallo ${roosterId} en el escaparate.`);
+        logger.info(`[${roosterId}] Publicando/Actualizando en escaparate.`);
         try {
             const galleraDoc = await db.collection("galleras").doc(galleraId).get();
             if (!galleraDoc.exists) {
-                logger.error(`Gallera ${galleraId} no encontrada.`);
+                logger.error(`[${roosterId}] Gallera ${galleraId} no encontrada. Abortando.`);
                 return showcaseRef.delete();
             }
             const ownerId = galleraDoc.data().ownerId;
-            const ownerDoc = await db.collection("users").doc(ownerId).get();
-            if (!ownerDoc.exists) {
-                logger.error(`Dueño ${ownerId} no encontrado.`);
+            if (!ownerId) {
+                logger.error(`[${roosterId}] La gallera ${galleraId} no tiene ownerId. Abortando.`);
                 return showcaseRef.delete();
             }
+
+            const ownerDoc = await db.collection("users").doc(ownerId).get();
+            if (!ownerDoc.exists) {
+                logger.error(`[${roosterId}] Dueño ${ownerId} no encontrado. Abortando.`);
+                return showcaseRef.delete();
+            }
+            
             const ownerName = ownerDoc.data().fullName;
             const galleraName = galleraDoc.data().name;
 
-            await showcaseRef.set({
+            // SANITIZACIÓN: Usamos `|| null` para convertir `undefined` a `null`, que es válido para Firestore.
+            const listingData = {
                 originalRoosterId: roosterId,
                 originalGalleraId: galleraId,
-                name: roosterData.name,
-                plate: roosterData.plate,
-                imageUrl: roosterData.imageUrl,
-                birthDate: roosterData.birthDate,
-                breedLine: roosterData.breedLine,
-                color: roosterData.color,
-                combType: roosterData.combType,
-                legColor: roosterData.legColor,
-                fatherName: roosterData.fatherName,
-                fatherPlate: roosterData.fatherPlate,
-                fatherLineageText: roosterData.fatherLineageText,
-                motherName: roosterData.motherName,
-                motherPlate: roosterData.motherPlate,
-                motherLineageText: roosterData.motherLineageText,
-                salePrice: roosterData.salePrice,
+                name: roosterData.name || null,
+                plate: roosterData.plate || null,
+                imageUrl: roosterData.imageUrl || null,
+                birthDate: roosterData.birthDate || null,
+                breedLine: roosterData.breedLine || null,
+                color: roosterData.color || null,
+                combType: roosterData.combType || null,
+                legColor: roosterData.legColor || null,
+                fatherName: roosterData.fatherName || null,
+                fatherPlate: roosterData.fatherPlate || null,
+                fatherLineageText: roosterData.fatherLineageText || null,
+                motherName: roosterData.motherName || null,
+                motherPlate: roosterData.motherPlate || null,
+                motherLineageText: roosterData.motherLineageText || null,
+                salePrice: roosterData.salePrice || null,
                 ownerUid: ownerId,
-                ownerName: ownerName,
-                galleraName: galleraName,
+                ownerName: ownerName || null,
+                galleraName: galleraName || null,
                 lastUpdate: FieldValue.serverTimestamp(),
-            }, { merge: true });
+            };
+            
+            await showcaseRef.set(listingData, { merge: true });
+            logger.info(`[${roosterId}] Anuncio publicado/actualizado con ÉXITO.`);
+
         } catch (error) {
-            logger.error("Error al publicar en el escaparate:", error);
+            logger.error(`[${roosterId}] ERROR CATASTRÓFICO durante la publicación:`, error);
+            try {
+                await showcaseRef.delete();
+            } catch (deleteError) {
+                // Silencio
+            }
         }
     } else {
-        logger.log(`Gallo ${roosterId} no cumple requisitos, quitando del escaparate.`);
+        logger.info(`[${roosterId}] No cumple requisitos. Limpiando escaparate.`);
         try {
             await showcaseRef.delete();
         } catch (error) {
-            logger.error("Error al eliminar del escaparate:", error);
+             if (error.code !== 5) {
+                logger.error(`[${roosterId}] Error al limpiar escaparate:`, error);
+            }
         }
     }
 });
@@ -98,6 +118,7 @@ exports.getGalleraMemberDetails = onCall(async (request) => {
     if (!galleraId) {
         throw new HttpsError("invalid-argument", "Se requiere el ID de la gallera.");
     }
+    
     try {
         const galleraDoc = await db.collection("galleras").doc(galleraId).get();
         if (!galleraDoc.exists) {
@@ -107,13 +128,12 @@ exports.getGalleraMemberDetails = onCall(async (request) => {
         if (!members || !members[requesterUid]) {
             throw new HttpsError("permission-denied", "No eres miembro de esta gallera.");
         }
+        
         const memberIds = Object.keys(members);
         if (memberIds.length === 0) return [];
+
         const userDocs = await db.collection("users").where(FieldPath.documentId(), "in", memberIds).get();
-        return userDocs.docs.map((doc) => ({
-            ...doc.data(),
-            roleInGallera: members[doc.id] ?? 'desconocido',
-        }));
+        return userDocs.docs.map((doc) => ({ ...doc.data(), roleInGallera: members[doc.id] ?? 'desconocido' }));
     } catch (error) {
         logger.error("Error en getGalleraMemberDetails:", error);
         throw new HttpsError("internal", "Error al obtener detalles de miembros.");
@@ -128,7 +148,6 @@ exports.inviteMemberToGallera = onCall(async (request) => {
         throw new HttpsError("unauthenticated", "Debes estar autenticado.");
     }
     const inviterUid = request.auth.uid;
-    const inviterName = request.auth.token.name || request.auth.token.email;
     const { galleraId, invitedEmail, role } = request.data;
     if (!galleraId || !invitedEmail || !role) {
         throw new HttpsError("invalid-argument", "Faltan datos.");
@@ -141,32 +160,31 @@ exports.inviteMemberToGallera = onCall(async (request) => {
         if (inviterUid === invitedUid) {
             throw new HttpsError("invalid-argument", "No puedes invitarte a ti mismo.");
         }
-
+        
         const galleraRef = db.collection("galleras").doc(galleraId);
         const invitationRef = db.collection("invitations").doc(invitedUid);
-
-        const galleraDoc = await galleraRef.get();
+        const inviterProfileRef = db.collection("users").doc(inviterUid);
+        
+        const [galleraDoc, inviterProfileDoc] = await Promise.all([galleraRef.get(), inviterProfileRef.get()]);
+        
         if (!galleraDoc.exists) {
             throw new HttpsError("not-found", "La gallera no existe.");
         }
         if (galleraDoc.data().ownerId !== inviterUid) {
             throw new HttpsError("permission-denied", "Solo el propietario puede invitar.");
         }
+        if (!inviterProfileDoc.exists) {
+            throw new HttpsError("internal", "No se pudo encontrar el perfil del invitador.");
+        }
         
         const galleraName = galleraDoc.data().name;
+        const inviterName = inviterProfileDoc.data().fullName;
 
         await invitationRef.set({
-            pending_invitations: {
-                [galleraId]: {
-                    inviterName: inviterName,
-                    galleraName: galleraName,
-                    role: role,
-                    date: FieldValue.serverTimestamp(),
-                },
-            },
+            pending_invitations: { [galleraId]: { inviterName, galleraName, role, date: FieldValue.serverTimestamp() } }
         }, { merge: true });
-
-        logger.log(`Invitación creada de ${inviterUid} para ${invitedUid} a la gallera ${galleraId}.`);
+        
+        logger.log(`Invitación creada de ${inviterUid} (${inviterName}) para ${invitedUid}.`);
         return { success: true, message: "Invitación enviada con éxito." };
 
     } catch (error) {
@@ -194,24 +212,19 @@ exports.acceptInvitation = onCall(async (request) => {
     const galleraRef = db.collection("galleras").doc(galleraId);
     const userRef = db.collection("users").doc(invitedUid);
     const invitationRef = db.collection("invitations").doc(invitedUid);
-
     try {
-        const invitationDoc = await invitationRef.get();
-        const pendingInvites = invitationDoc.data()?.pending_invitations || {};
-        const invitation = pendingInvites[galleraId];
-
-        if (!invitation) {
-            throw new HttpsError("not-found", "No se encontró una invitación válida para esta gallera.");
-        }
-        
-        const role = invitation.role;
-
-        await db.runTransaction(async (transaction) => {
-            transaction.update(galleraRef, { [`members.${invitedUid}`]: role });
-            transaction.update(userRef, { galleraIds: FieldValue.arrayUnion(galleraId) });
-            transaction.update(invitationRef, { [`pending_invitations.${galleraId}`]: FieldValue.delete() });
+        await db.runTransaction(async (t) => {
+            const invitationDoc = await t.get(invitationRef);
+            const invitation = invitationDoc.data()?.pending_invitations?.[galleraId];
+            if (!invitation) {
+                throw new HttpsError("not-found", "No se encontró una invitación válida.");
+            }
+            const role = invitation.role;
+            
+            t.update(galleraRef, { [`members.${invitedUid}`]: role });
+            t.update(userRef, { galleraIds: FieldValue.arrayUnion(galleraId) });
+            t.update(invitationRef, { [`pending_invitations.${galleraId}`]: FieldValue.delete() });
         });
-
         logger.log(`Usuario ${invitedUid} aceptó la invitación a la gallera ${galleraId}.`);
         return { success: true, message: "Te has unido a la gallera con éxito." };
 
@@ -236,9 +249,7 @@ exports.declineInvitation = onCall(async (request) => {
 
     const invitationRef = db.collection("invitations").doc(invitedUid);
     try {
-        await invitationRef.update({
-            [`pending_invitations.${galleraId}`]: FieldValue.delete(),
-        });
+        await invitationRef.update({ [`pending_invitations.${galleraId}`]: FieldValue.delete() });
         logger.log(`Usuario ${invitedUid} rechazó la invitación a la gallera ${galleraId}.`);
         return { success: true, message: "Invitación rechazada." };
     } catch (error) {
@@ -264,11 +275,17 @@ exports.removeMemberFromGallera = onCall(async (request) => {
         const galleraRef = db.collection("galleras").doc(galleraId);
         await db.runTransaction(async (transaction) => {
             const galleraDoc = await transaction.get(galleraRef);
-            if (!galleraDoc.exists) throw new HttpsError("not-found", "La gallera no existe.");
+            if (!galleraDoc.exists) {
+                throw new HttpsError("not-found", "La gallera no existe.");
+            }
 
             const galleraData = galleraDoc.data();
-            if (galleraData.ownerId !== removerUid) throw new HttpsError("permission-denied", "Solo el propietario puede eliminar.");
-            if (galleraData.ownerId === memberId) throw new HttpsError("invalid-argument", "El propietario no puede eliminarse.");
+            if (galleraData.ownerId !== removerUid) {
+                throw new HttpsError("permission-denied", "Solo el propietario puede eliminar.");
+            }
+            if (galleraData.ownerId === memberId) {
+                throw new HttpsError("invalid-argument", "El propietario no puede eliminarse a sí mismo.");
+            }
 
             const memberToRemoveRef = db.collection("users").doc(memberId);
             transaction.update(galleraRef, { [`members.${memberId}`]: FieldValue.delete() });
@@ -306,8 +323,11 @@ exports.validateAndroidPurchase = onCall(async (request) => {
             throw new HttpsError("failed-precondition", `La compra no está activa. Estado: ${purchaseData.paymentState}`);
         }
         let newPlan = "iniciacion";
-        if (subscriptionId.startsWith("maestro_criador")) newPlan = "maestro";
-        else if (subscriptionId.startsWith("club_elite")) newPlan = "elite";
+        if (subscriptionId.startsWith("maestro_criador")) {
+            newPlan = "maestro";
+        } else if (subscriptionId.startsWith("club_elite")) {
+            newPlan = "elite";
+        }
         
         const expiryTimeMillis = parseInt(purchaseData.expiryTimeMillis);
 

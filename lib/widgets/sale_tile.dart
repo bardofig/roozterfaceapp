@@ -34,7 +34,6 @@ class SaleTile extends StatelessWidget {
           padding: const EdgeInsets.all(12.0),
           child: Row(
             children: [
-              // Columna de la Imagen
               SizedBox(
                 width: 80,
                 height: 80,
@@ -57,31 +56,24 @@ class SaleTile extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              // Columna de los Detalles
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      soldRooster.name,
-                      style: theme.textTheme.titleLarge,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    Text(soldRooster.name,
+                        style: theme.textTheme.titleLarge,
+                        overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 4),
                     Text(
                       'Vendido a: ${soldRooster.buyerName?.isNotEmpty == true ? soldRooster.buyerName : "No registrado"}',
                       style: theme.textTheme.bodyMedium,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      saleDate,
-                      style: theme.textTheme.bodySmall,
-                    ),
+                    Text(saleDate, style: theme.textTheme.bodySmall),
                   ],
                 ),
               ),
               const SizedBox(width: 16),
-              // Columna del Precio
               Text(
                 salePrice,
                 style: theme.textTheme.titleMedium?.copyWith(

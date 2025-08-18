@@ -4,7 +4,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/screens/chat_screen.dart';
+import 'package:roozterfaceapp/screens/subscription_screen.dart'; // Importamos la pantalla de suscripciones
 
 class ListingDetailsScreen extends StatelessWidget {
   final Map<String, dynamic> listingData;
@@ -14,11 +17,52 @@ class ListingDetailsScreen extends StatelessWidget {
     required this.listingData,
   });
 
+  // --- NUEVO MÉTODO PARA MOSTRAR EL DIÁLOGO DE VENTA ---
+  void _showUpgradeDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Accede al Círculo de Criadores'),
+          content: const Text(
+              'Para contactar a otros criadores, enviar mensajes y realizar ofertas, necesitas una suscripción Maestro Criador o superior.'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Ahora No'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Cierra el diálogo
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) =>
+                          const SubscriptionScreen()), // Navega a la pantalla de planes
+                );
+              },
+              child: const Text('Ver Planes'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Extracción segura de todos los datos
+    // Obtenemos el plan del usuario actual desde el Provider
+    final currentUserPlan =
+        Provider.of<UserDataProvider>(context, listen: false)
+                .userProfile
+                ?.plan ??
+            'iniciacion';
+    final bool isSubscriber = currentUserPlan != 'iniciacion';
+
     final String name = listingData['name'] ?? 'Sin Nombre';
     final String imageUrl = listingData['imageUrl'] ?? '';
     final String plate = listingData['plate'] ?? 'N/A';
@@ -38,36 +82,12 @@ class ListingDetailsScreen extends StatelessWidget {
     final String color = listingData['color'] ?? 'No registrado';
     final String combType = listingData['combType'] ?? 'No registrado';
     final String legColor = listingData['legColor'] ?? 'No registrado';
-
-    // --- LÓGICA DE CASCADA PARA EL LINAJE ---
-    final String fatherName = listingData['fatherName'] ?? '';
-    final String fatherPlate = listingData['fatherPlate'] ?? '';
-    final String fatherLineageText = listingData['fatherLineageText'] ?? '';
-
-    String fatherDisplay;
-    if (fatherName.isNotEmpty) {
-      fatherDisplay =
-          '$fatherName (${fatherPlate.isNotEmpty ? fatherPlate : "S/P"})';
-    } else if (fatherLineageText.isNotEmpty) {
-      fatherDisplay = fatherLineageText;
-    } else {
-      fatherDisplay = 'No registrado';
-    }
-
-    final String motherName = listingData['motherName'] ?? '';
-    final String motherPlate = listingData['motherPlate'] ?? '';
-    final String motherLineageText = listingData['motherLineageText'] ?? '';
-
-    String motherDisplay;
-    if (motherName.isNotEmpty) {
-      motherDisplay =
-          '$motherName (${motherPlate.isNotEmpty ? motherPlate : "S/P"})';
-    } else if (motherLineageText.isNotEmpty) {
-      motherDisplay = motherLineageText;
-    } else {
-      motherDisplay = 'No registrada';
-    }
-    // ---------------------------------------------
+    final String fatherLineage = listingData['fatherName']?.isNotEmpty == true
+        ? '${listingData['fatherName']} (${listingData['fatherPlate'] ?? "S/P"})'
+        : listingData['fatherLineageText'] ?? 'No registrado';
+    final String motherLineage = listingData['motherName']?.isNotEmpty == true
+        ? '${listingData['motherName']} (${listingData['motherPlate'] ?? "S/P"})'
+        : listingData['motherLineageText'] ?? 'No registrada';
 
     final String formattedPrice = salePrice > 0
         ? NumberFormat.currency(locale: 'es_MX', symbol: '\$').format(salePrice)
@@ -140,11 +160,11 @@ class ListingDetailsScreen extends StatelessWidget {
                   _buildDetailRow(context,
                       icon: Icons.male,
                       label: 'Línea Paterna:',
-                      value: fatherDisplay),
+                      value: fatherLineage),
                   _buildDetailRow(context,
                       icon: Icons.female,
                       label: 'Línea Materna:',
-                      value: motherDisplay),
+                      value: motherLineage),
                 ],
               ),
             ),
@@ -167,18 +187,25 @@ class ListingDetailsScreen extends StatelessWidget {
                       ElevatedButton.icon(
                         icon: const Icon(Icons.chat_bubble_outline),
                         label: const Text('Contactar al Criador'),
+                        // --- ¡LÓGICA DE LA BARRERA DE VALOR! ---
                         onPressed: ownerUid.isEmpty
                             ? null
                             : () {
-                                Navigator.push(context,
-                                    MaterialPageRoute(builder: (_) {
-                                  return ChatScreen(
-                                    recipientId: ownerUid,
-                                    recipientName: ownerName,
-                                    subjectRoosterId: roosterId,
-                                    subjectRoosterName: name,
-                                  );
-                                }));
+                                if (isSubscriber) {
+                                  // Si es suscriptor, abre el chat
+                                  Navigator.push(context,
+                                      MaterialPageRoute(builder: (_) {
+                                    return ChatScreen(
+                                      recipientId: ownerUid,
+                                      recipientName: ownerName,
+                                      subjectRoosterId: roosterId,
+                                      subjectRoosterName: name,
+                                    );
+                                  }));
+                                } else {
+                                  // Si no lo es, muestra el diálogo de venta
+                                  _showUpgradeDialog(context);
+                                }
                               },
                         style: ElevatedButton.styleFrom(
                           minimumSize: const Size(double.infinity, 50),

@@ -35,9 +35,7 @@ class _BreedingDetailsScreenState extends State<BreedingDetailsScreen> {
             'iniciacion';
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detalles de la Cruza y Nidada'),
-      ),
+      appBar: AppBar(title: const Text('Detalles de la Cruza y Nidada')),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('galleras')
@@ -108,39 +106,32 @@ class _BreedingDetailsScreenState extends State<BreedingDetailsScreen> {
   Widget _buildClutchManagementCard(
       BuildContext context, BreedingEventModel event, String currentUserPlan) {
     final theme = Theme.of(context);
-
-    // --- ¡LÓGICA DE INTELIGENCIA! ---
     String expectedHatchDateStr = 'No calculable';
     if (event.incubationStartDate != null) {
       final expectedDate =
           event.incubationStartDate!.toDate().add(const Duration(days: 21));
       expectedHatchDateStr = DateFormat('dd/MM/yyyy').format(expectedDate);
     }
-
     double hatchRate = 0.0;
     if (event.eggCount != null &&
         event.chicksHatched != null &&
         event.eggCount! > 0) {
       hatchRate = event.chicksHatched! / event.eggCount!;
     }
-
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Gestión de Nidada', style: theme.textTheme.titleLarge),
-                IconButton(
-                  icon: const Icon(Icons.edit_note),
-                  onPressed: () => _showEditClutchDialog(context, event),
-                  tooltip: 'Editar datos de la nidada',
-                ),
-              ],
-            ),
+            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+              Text('Gestión de Nidada', style: theme.textTheme.titleLarge),
+              IconButton(
+                icon: const Icon(Icons.edit_note),
+                onPressed: () => _showEditClutchDialog(context, event),
+                tooltip: 'Editar datos de la nidada',
+              ),
+            ]),
             const Divider(),
             _buildInfoRow(
                 'Huevos Puestos:', event.eggCount?.toString() ?? 'N/R'),
@@ -150,13 +141,9 @@ class _BreedingDetailsScreenState extends State<BreedingDetailsScreen> {
                     ? DateFormat('dd/MM/yyyy')
                         .format(event.incubationStartDate!.toDate())
                     : 'N/R'),
-
-            // --- ¡NUEVA FILA DE INFORMACIÓN INTELIGENTE! ---
             _buildInfoRow('Eclosión Esperada:', expectedHatchDateStr,
                 isCalculated: true),
-
             const Divider(height: 24, thickness: 1),
-
             _buildInfoRow(
                 'Pollos Nacidos:', event.chicksHatched?.toString() ?? 'N/R'),
             _buildInfoRow(
@@ -164,38 +151,31 @@ class _BreedingDetailsScreenState extends State<BreedingDetailsScreen> {
                 event.hatchDate != null
                     ? DateFormat('dd/MM/yyyy').format(event.hatchDate!.toDate())
                     : 'N/R'),
-
-            // --- ¡NUEVA FILA DE ANÁLISIS! ---
             if (hatchRate > 0)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text("Porcentaje de Eclosión:",
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text("${(hatchRate * 100).toStringAsFixed(1)}%",
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: hatchRate,
-                      minHeight: 10,
-                      borderRadius: BorderRadius.circular(5),
-                      backgroundColor: Colors.grey.shade300,
-                      color: Colors.green,
-                    )
-                  ],
-                ),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text("Porcentaje de Eclosión:",
+                                style: TextStyle(fontWeight: FontWeight.bold)),
+                            Text("${(hatchRate * 100).toStringAsFixed(1)}%",
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.bold)),
+                          ]),
+                      const SizedBox(height: 8),
+                      LinearProgressIndicator(
+                          value: hatchRate,
+                          minHeight: 10,
+                          borderRadius: BorderRadius.circular(5),
+                          backgroundColor: Colors.grey.shade300,
+                          color: Colors.green),
+                    ]),
               ),
-
             const Divider(height: 24, thickness: 1),
-
             _buildInfoRow(
                 'Notas de Nidada:',
                 event.clutchNotes?.isNotEmpty == true
@@ -275,56 +255,53 @@ class _BreedingDetailsScreenState extends State<BreedingDetailsScreen> {
               return AlertDialog(
                 title: const Text('Editar Datos de Nidada'),
                 content: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextField(
-                          controller: eggController,
-                          decoration:
-                              const InputDecoration(labelText: 'Nº de Huevos'),
-                          keyboardType: TextInputType.number),
-                      TextField(
-                          controller: chicksController,
-                          decoration: const InputDecoration(
-                              labelText: 'Nº de Pollos Nacidos'),
-                          keyboardType: TextInputType.number),
-                      const SizedBox(height: 16),
-                      Text(
-                          'Inicio Incubación: ${incubationDate != null ? DateFormat('dd/MM/yyyy').format(incubationDate!) : "No fijada"}'),
-                      ElevatedButton(
-                          child: const Text('Seleccionar Fecha'),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                                context: context,
-                                initialDate: incubationDate ?? DateTime.now(),
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime.now());
-                            if (picked != null)
-                              setDialogState(() => incubationDate = picked);
-                          }),
-                      const SizedBox(height: 16),
-                      Text(
-                          'Fecha Eclosión: ${hatchDate != null ? DateFormat('dd/MM/yyyy').format(hatchDate!) : "No fijada"}'),
-                      ElevatedButton(
-                          child: const Text('Seleccionar Fecha'),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                                context: context,
-                                initialDate: hatchDate ?? DateTime.now(),
-                                firstDate: DateTime(2000),
-                                lastDate: DateTime.now());
-                            if (picked != null)
-                              setDialogState(() => hatchDate = picked);
-                          }),
-                      const SizedBox(height: 16),
-                      TextField(
-                          controller: notesController,
-                          decoration: const InputDecoration(
-                              labelText: 'Notas de la Nidada'),
-                          maxLines: 2,
-                          textCapitalization: TextCapitalization.sentences),
-                    ],
-                  ),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    TextField(
+                        controller: eggController,
+                        decoration:
+                            const InputDecoration(labelText: 'Nº de Huevos'),
+                        keyboardType: TextInputType.number),
+                    TextField(
+                        controller: chicksController,
+                        decoration: const InputDecoration(
+                            labelText: 'Nº de Pollos Nacidos'),
+                        keyboardType: TextInputType.number),
+                    const SizedBox(height: 16),
+                    Text(
+                        'Inicio Incubación: ${incubationDate != null ? DateFormat('dd/MM/yyyy').format(incubationDate!) : "No fijada"}'),
+                    ElevatedButton(
+                        child: const Text('Seleccionar Fecha'),
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                              context: context,
+                              initialDate: incubationDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime.now());
+                          if (picked != null)
+                            setDialogState(() => incubationDate = picked);
+                        }),
+                    const SizedBox(height: 16),
+                    Text(
+                        'Fecha Eclosión: ${hatchDate != null ? DateFormat('dd/MM/yyyy').format(hatchDate!) : "No fijada"}'),
+                    ElevatedButton(
+                        child: const Text('Seleccionar Fecha'),
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                              context: context,
+                              initialDate: hatchDate ?? DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime.now());
+                          if (picked != null)
+                            setDialogState(() => hatchDate = picked);
+                        }),
+                    const SizedBox(height: 16),
+                    TextField(
+                        controller: notesController,
+                        decoration: const InputDecoration(
+                            labelText: 'Notas de la Nidada'),
+                        maxLines: 2,
+                        textCapitalization: TextCapitalization.sentences),
+                  ]),
                 ),
                 actions: [
                   TextButton(

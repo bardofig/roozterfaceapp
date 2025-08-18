@@ -37,7 +37,6 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _chatRoomId = _chatService.getChatRoomId(widget.recipientId);
 
-    // Al entrar a la pantalla, marcamos inmediatamente el chat como leído.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _chatService.markChatAsRead(_chatRoomId);
     });
@@ -45,14 +44,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void _sendMessage() {
     if (_messageController.text.trim().isNotEmpty) {
-      // EL COMANDANTE RECOGE LA INFORMACIÓN...
       final currentUserName =
           Provider.of<UserDataProvider>(context, listen: false)
                   .userProfile
                   ?.fullName ??
               'Usuario Desconocido';
 
-      // ...Y SE LA PASA AL SOLDADO PARA QUE EJECUTE.
       _chatService.sendMessage(
         recipientId: widget.recipientId,
         messageText: _messageController.text,
@@ -86,7 +83,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           Expanded(
-            child: _buildMessagesList(),
+            child: _buildMessagesListContainer(),
           ),
           _buildMessageComposer(),
         ],
@@ -94,25 +91,49 @@ class _ChatScreenState extends State<ChatScreen> {
     );
   }
 
-  Widget _buildMessagesList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _chatService.getMessages(_chatRoomId),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return const Center(child: Text('Error al cargar mensajes.'));
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
+  // --- LA ARQUITECTURA FINAL ---
+  Widget _buildMessagesListContainer() {
+    // 1. El StreamBuilder padre escucha el documento de resumen del chat.
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _chatService.getChatRoomStream(_chatRoomId),
+      builder: (context, chatSnapshot) {
+        if (!chatSnapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('Inicia la conversación.'));
+
+        Timestamp? myDeleteMarker;
+        if (chatSnapshot.data!.exists) {
+          final data = chatSnapshot.data!.data() as Map<String, dynamic>;
+          final Map<String, dynamic> deletedUpTo = data['deleted_up_to'] ?? {};
+          myDeleteMarker = deletedUpTo[_auth.currentUser!.uid];
         }
 
-        return ListView(
-          reverse: true,
-          padding: const EdgeInsets.all(8.0),
-          children:
-              snapshot.data!.docs.map((doc) => _buildMessageItem(doc)).toList(),
+        // 2. CON la información del marcador, construimos el StreamBuilder hijo.
+        return StreamBuilder<QuerySnapshot>(
+          stream: _chatService.getMessages(_chatRoomId, myDeleteMarker),
+          builder: (context, messagesSnapshot) {
+            if (messagesSnapshot.hasError) {
+              return const Center(child: Text('Error al cargar mensajes.'));
+            }
+            if (messagesSnapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            if (!messagesSnapshot.hasData ||
+                messagesSnapshot.data!.docs.isEmpty) {
+              return Center(
+                  child: Text(myDeleteMarker != null
+                      ? 'No hay mensajes nuevos.'
+                      : 'Inicia la conversación.'));
+            }
+
+            return ListView.builder(
+              reverse: true,
+              padding: const EdgeInsets.all(8.0),
+              itemCount: messagesSnapshot.data!.docs.length,
+              itemBuilder: (context, index) =>
+                  _buildMessageItem(messagesSnapshot.data!.docs[index]),
+            );
+          },
         );
       },
     );

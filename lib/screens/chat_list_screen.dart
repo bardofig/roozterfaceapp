@@ -18,30 +18,84 @@ class _ChatListScreenState extends State<ChatListScreen> {
   final ChatService _chatService = ChatService();
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  Future<void> _confirmAndHideChat(DocumentSnapshot chatDoc) async {
+    final bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Eliminar Conversación"),
+          content: const Text(
+              "¿Estás seguro de que quieres eliminar esta conversación de tu bandeja de entrada? No se eliminará para la otra persona."),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text("Cancelar"),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text("Eliminar"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      try {
+        await _chatService.deleteChatForCurrentUser(chatDoc.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Conversación eliminada.')));
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Mis Conversaciones'),
       ),
-      // Usamos un color de fondo ligeramente diferente para que las Card resalten
       backgroundColor:
           Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.2),
       body: StreamBuilder<QuerySnapshot>(
         stream: _chatService.getChatListStream(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            String errorMessage = 'Error al cargar las conversaciones.';
-            if (snapshot.error is FirebaseException) {
-              errorMessage =
-                  'Error: ${(snapshot.error as FirebaseException).message}';
-            }
-            return Center(child: Text(errorMessage));
+            return Center(
+                child: Text(
+                    'Error al cargar las conversaciones: ${snapshot.error}'));
           }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+
+          final currentUserId = _auth.currentUser?.uid;
+          if (currentUserId == null) {
+            return const Center(
+                child: Text(
+                    "No se pudo verificar el usuario. Por favor, reinicia sesión."));
+          }
+
+          final visibleChatDocs = snapshot.data?.docs.where((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                final participants =
+                    List<String>.from(data['participants'] ?? []);
+                final hiddenFor = List<String>.from(data['hidden_for'] ?? []);
+                final belongsToMe = participants.contains(currentUserId);
+                final isHidden = hiddenFor.contains(currentUserId);
+                return belongsToMe && !isHidden;
+              }).toList() ??
+              [];
+
+          if (visibleChatDocs.isEmpty) {
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(16.0),
@@ -54,13 +108,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
           }
 
-          final chatDocs = snapshot.data!.docs;
-
           return ListView.builder(
-            padding: const EdgeInsets.symmetric(vertical: 8.0),
-            itemCount: chatDocs.length,
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            itemCount: visibleChatDocs.length,
             itemBuilder: (context, index) {
-              final chatDoc = chatDocs[index];
+              final chatDoc = visibleChatDocs[index];
               final data = chatDoc.data() as Map<String, dynamic>;
 
               final List<String> participants =
@@ -76,26 +128,38 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
               final String subjectRoosterName =
                   data['subjectRoosterName'] ?? 'un ejemplar';
-              // Este ID ahora es crucial para reabrir el chat correcto
-              final String subjectRoosterId =
-                  data['subjectRoosterId'] ?? chatDoc.id;
+              final String subjectRoosterId = data['subjectRoosterId'] ?? '';
 
-              return ChatListTile(
-                chatDocument: chatDoc,
-                onTap: () {
-                  if (otherUserId.isEmpty) return;
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ChatScreen(
-                        recipientId: otherUserId,
-                        recipientName: otherUserName,
-                        subjectRoosterId: subjectRoosterId,
-                        subjectRoosterName: subjectRoosterName,
-                      ),
-                    ),
-                  );
+              return Dismissible(
+                key: Key(chatDoc.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  color: Colors.red.shade700,
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20.0),
+                  child: const Icon(Icons.delete_forever, color: Colors.white),
+                ),
+                confirmDismiss: (direction) async {
+                  await _confirmAndHideChat(chatDoc);
+                  return false;
                 },
+                child: ChatListTile(
+                  chatDocument: chatDoc,
+                  onTap: () {
+                    if (otherUserId.isEmpty) return;
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          recipientId: otherUserId,
+                          recipientName: otherUserName,
+                          subjectRoosterId: subjectRoosterId,
+                          subjectRoosterName: subjectRoosterName,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               );
             },
           );

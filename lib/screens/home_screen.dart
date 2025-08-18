@@ -8,8 +8,10 @@ import 'package:roozterfaceapp/models/user_model.dart';
 import 'package:roozterfaceapp/providers/rooster_list_provider.dart';
 import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
+import 'package:roozterfaceapp/screens/area_management_screen.dart';
 import 'package:roozterfaceapp/screens/breeding_list_screen.dart';
 import 'package:roozterfaceapp/screens/chat_list_screen.dart';
+import 'package:roozterfaceapp/screens/expenses_screen.dart';
 import 'package:roozterfaceapp/screens/gallera_management_screen.dart';
 import 'package:roozterfaceapp/screens/gallera_switcher_screen.dart';
 import 'package:roozterfaceapp/screens/invitations_screen.dart';
@@ -24,7 +26,7 @@ import 'package:roozterfaceapp/services/chat_service.dart';
 import 'package:roozterfaceapp/services/invitation_service.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';
 import 'package:roozterfaceapp/theme/theme_provider.dart';
-import 'package:roozterfaceapp/widgets/rooster_tile.dart';
+import 'package:roozterfaceapp/widgets/rooster_list_view.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -33,11 +35,25 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   final AuthService _authService = AuthService();
   final RoosterService _roosterService = RoosterService();
   final InvitationService _invitationService = InvitationService();
   final ChatService _chatService = ChatService();
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   void signOut() {
     _authService.signOut();
@@ -46,62 +62,50 @@ class _HomeScreenState extends State<HomeScreen> {
   void addRooster(BuildContext context) {
     final userProvider = Provider.of<UserDataProvider>(context, listen: false);
     final userProfile = userProvider.userProfile;
-
     if (userProfile == null || userProfile.activeGalleraId == null) return;
-
     Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => AddRoosterScreen(
-          currentUserPlan: userProfile.plan,
-          activeGalleraId: userProfile.activeGalleraId!,
-        ),
-        fullscreenDialog: true,
-      ),
-    );
+        context,
+        MaterialPageRoute(
+          builder: (context) => AddRoosterScreen(
+            currentUserPlan: userProfile.plan,
+            activeGalleraId: userProfile.activeGalleraId!,
+          ),
+          fullscreenDialog: true,
+        ));
   }
 
   void goToRoosterDetails(BuildContext context, RoosterModel rooster) {
     Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => RoosterDetailsScreen(
-          rooster: rooster,
-        ),
-      ),
-    );
+        context,
+        MaterialPageRoute(
+          builder: (context) => RoosterDetailsScreen(rooster: rooster),
+        ));
   }
 
   void _showLimitDialog() {
     showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Límite Alcanzado"),
-          content: const Text(
-            "Has alcanzado el límite de 15 gallos para el Plan Iniciación. ¡Mejora tu plan para añadir más!",
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Entendido"),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SubscriptionScreen(),
-                  ),
-                );
-              },
-              child: const Text("Mejorar Plan"),
-            ),
-          ],
-        );
-      },
-    );
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text("Límite Alcanzado"),
+            content: const Text(
+                "Has alcanzado el límite de 15 gallos para el Plan Iniciación. ¡Mejora tu plan para añadir más!"),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text("Entendido")),
+              TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const SubscriptionScreen()));
+                  },
+                  child: const Text("Mejorar Plan")),
+            ],
+          );
+        });
   }
 
   Future<bool> _deleteRooster(
@@ -111,24 +115,17 @@ class _HomeScreenState extends State<HomeScreen> {
             .userProfile
             ?.activeGalleraId;
     if (activeGalleraId == null) return false;
-
     try {
       await _roosterService.deleteRooster(
-        galleraId: activeGalleraId,
-        rooster: rooster,
-      );
-      if (mounted) {
+          galleraId: activeGalleraId, rooster: rooster);
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('"${rooster.name}" ha sido borrado.')),
-        );
-      }
+            SnackBar(content: Text('"${rooster.name}" ha sido borrado.')));
       return true;
     } catch (e) {
-      if (mounted) {
+      if (mounted)
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al borrar: ${e.toString()}')),
-        );
-      }
+            SnackBar(content: Text('Error al borrar: ${e.toString()}')));
       return false;
     }
   }
@@ -144,9 +141,8 @@ class _HomeScreenState extends State<HomeScreen> {
               "¿Estás seguro de que quieres borrar a \"${rooster.name}\"?"),
           actions: <Widget>[
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text("Cancelar"),
-            ),
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text("Cancelar")),
             TextButton(
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               onPressed: () => Navigator.of(context).pop(true),
@@ -156,7 +152,6 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
-
     if (confirm == true) {
       return await _deleteRooster(context, rooster);
     }
@@ -167,37 +162,48 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Consumer2<UserDataProvider, RoosterListProvider>(
       builder: (context, userProvider, roosterProvider, child) {
-        if (userProvider.isLoading || roosterProvider.isLoading) {
+        if (userProvider.isLoading ||
+            (userProvider.userProfile?.activeGalleraId != null &&
+                roosterProvider.isLoading)) {
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
         }
-
         if (userProvider.userProfile == null) {
           return const Scaffold(
               body: Center(child: Text("Cargando perfil...")));
         }
-
         final userProfile = userProvider.userProfile!;
         final activeGalleraId = userProfile.activeGalleraId;
-        final roosters = roosterProvider.roosters;
-        final isPlanIniciacion = userProfile.plan == 'iniciacion';
-        final canAddRooster = !isPlanIniciacion || roosters.length < 15;
 
         if (activeGalleraId == null || activeGalleraId.isEmpty) {
           return Scaffold(
-            appBar: AppBar(title: const Text('Mis Gallos')),
+            appBar: AppBar(
+                title: const Text('Mis Ejemplares'),
+                actions: [_buildInvitationsButton(), _buildChatButton()]),
             drawer: _buildDrawer(context, userProfile),
             body: _buildWelcomeMessage(),
           );
         }
 
+        final allRoosters = roosterProvider.roosters;
+        final isPlanIniciacion = userProfile.plan == 'iniciacion';
+        final canAddRooster = !isPlanIniciacion || allRoosters.length < 15;
+
+        final gallos = allRoosters.where((r) => r.sex == 'macho').toList();
+        final gallinas = allRoosters.where((r) => r.sex == 'hembra').toList();
+
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Mis Gallos'),
-            actions: [
-              _buildInvitationsButton(),
-              _buildChatButton(),
-            ],
+            title: const Text('Mis Ejemplares'),
+            actions: [_buildInvitationsButton(), _buildChatButton()],
+            bottom: TabBar(
+              controller: _tabController,
+              tabs: [
+                Tab(text: 'Todos (${allRoosters.length})'),
+                Tab(text: 'Gallos (${gallos.length})'),
+                Tab(text: 'Gallinas (${gallinas.length})'),
+              ],
+            ),
           ),
           drawer: _buildDrawer(context, userProfile),
           floatingActionButton: FloatingActionButton(
@@ -214,44 +220,33 @@ class _HomeScreenState extends State<HomeScreen> {
             child:
                 Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
           ),
-          body: _buildBody(context, roosters),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              RoosterListView(
+                  roosters: allRoosters,
+                  onDelete: (rooster) => _confirmDelete(context, rooster),
+                  onTap: (rooster) => goToRoosterDetails(context, rooster)),
+              RoosterListView(
+                  roosters: gallos,
+                  onDelete: (rooster) => _confirmDelete(context, rooster),
+                  onTap: (rooster) => goToRoosterDetails(context, rooster)),
+              RoosterListView(
+                  roosters: gallinas,
+                  onDelete: (rooster) => _confirmDelete(context, rooster),
+                  onTap: (rooster) => goToRoosterDetails(context, rooster)),
+            ],
+          ),
         );
       },
     );
   }
 
   Widget _buildBody(BuildContext context, List<RoosterModel> roosters) {
-    if (roosters.isEmpty) {
-      return const Center(
-        child: Text(
-          "No tienes gallos registrados.\n¡Añade el primero!",
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 18, color: Colors.grey),
-        ),
-      );
-    }
-
-    return ListView.builder(
-      itemCount: roosters.length,
-      itemBuilder: (context, index) {
-        final rooster = roosters[index];
-        return Dismissible(
-          key: Key(rooster.id),
-          direction: DismissDirection.endToStart,
-          background: Container(
-            color: Colors.red,
-            alignment: Alignment.centerRight,
-            padding: const EdgeInsets.only(right: 20.0),
-            child: const Icon(Icons.delete, color: Colors.white),
-          ),
-          confirmDismiss: (direction) => _confirmDelete(context, rooster),
-          child: RoosterTile(
-            rooster: rooster,
-            onTap: () => goToRoosterDetails(context, rooster),
-          ),
-        );
-      },
-    );
+    return RoosterListView(
+        roosters: roosters,
+        onDelete: (rooster) => _confirmDelete(context, rooster),
+        onTap: (rooster) => goToRoosterDetails(context, rooster));
   }
 
   Widget _buildInvitationsButton() {
@@ -310,18 +305,18 @@ class _HomeScreenState extends State<HomeScreen> {
           if (currentUser != null) {
             for (var doc in snapshot.data!.docs) {
               final data = doc.data() as Map<String, dynamic>;
-              final Timestamp? lastMessageTimestamp =
-                  data['lastMessageTimestamp'];
               final String lastSenderId = data['lastMessageSenderId'] ?? '';
-              final Map<String, dynamic> lastReadByMap =
-                  data['lastMessageReadBy'] ?? {};
-              final Timestamp? myLastReadTimestamp =
-                  lastReadByMap[currentUser.uid];
-
-              if (lastSenderId != currentUser.uid &&
-                  lastMessageTimestamp != null) {
-                if (myLastReadTimestamp == null ||
-                    lastMessageTimestamp.compareTo(myLastReadTimestamp) > 0) {
+              if (lastSenderId != currentUser.uid) {
+                final Timestamp? lastMessageTimestamp =
+                    data['lastMessageTimestamp'];
+                final Map<String, dynamic> lastReadByMap =
+                    data['lastMessageReadBy'] ?? {};
+                final Timestamp? myLastReadTimestamp =
+                    lastReadByMap[currentUser.uid];
+                if (lastMessageTimestamp != null &&
+                    (myLastReadTimestamp == null ||
+                        lastMessageTimestamp.compareTo(myLastReadTimestamp) >
+                            0)) {
                   hasUnread = true;
                   break;
                 }
@@ -329,7 +324,6 @@ class _HomeScreenState extends State<HomeScreen> {
             }
           }
         }
-
         return Stack(
           alignment: Alignment.center,
           children: [
@@ -365,28 +359,23 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              "Bienvenido a tu Gallera Digital.",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-            ),
+            const Text("Bienvenido a tu Gallera Digital.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             const Text(
-              "Parece que no tienes una gallera activa o no perteneces a ninguna.",
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey),
-            ),
+                "Parece que no tienes una gallera activa o no perteneces a ninguna.",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey)),
             const SizedBox(height: 20),
             ElevatedButton.icon(
               icon: const Icon(Icons.swap_horiz),
               label: const Text("Seleccionar o Crear Gallera"),
               onPressed: () {
                 Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const GalleraSwitcherScreen(),
-                  ),
-                );
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const GalleraSwitcherScreen()));
               },
             )
           ],
@@ -399,183 +388,71 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool isMaestroOrHigher =
         userProfile.plan == 'maestro' || userProfile.plan == 'elite';
     final bool isEliteUser = userProfile.plan == 'elite';
+    final bool canManageGallera = isEliteUser;
+
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          SizedBox(
-            height: 220,
-            child: DrawerHeader(
-              padding: const EdgeInsets.all(8.0),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12.0),
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: Transform.flip(
-                        flipX: true,
-                        child: Image.asset(
-                          'assets/images/gallosinfondo.png',
-                          fit: BoxFit.cover,
-                          color: Colors.black.withOpacity(0.5),
-                          colorBlendMode: BlendMode.darken,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 12.0,
-                      left: 12.0,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            userProfile.fullName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              shadows: [
-                                Shadow(blurRadius: 3, color: Colors.black)
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            userProfile.email,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                              shadows: [
-                                Shadow(blurRadius: 2, color: Colors.black)
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.swap_horiz),
-            title: const Text('Cambiar Gallera'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const GalleraSwitcherScreen(),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.account_circle_outlined),
-            title: const Text('Mi Perfil'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.shopping_basket_outlined),
-            title: const Text('Mercado de Ejemplares'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MarketplaceScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-          if (isMaestroOrHigher)
-            ListTile(
-              leading: const Icon(Icons.auto_stories),
-              title: const Text('Libro de Cría'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const BreedingListScreen(),
-                  ),
-                );
-              },
-            ),
-          if (isMaestroOrHigher)
-            ListTile(
-              leading: const Icon(Icons.monetization_on_outlined),
-              title: const Text('Registro de Ventas'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const SalesHistoryScreen(),
-                  ),
-                );
-              },
-            ),
+          _buildDrawerHeader(context, userProfile),
+          _buildDrawerSectionHeader(context, 'Mercado'),
+          _buildDrawerItem(context,
+              icon: Icons.shopping_basket_outlined,
+              title: 'Mercado de Ejemplares',
+              onTap: () => _navigateTo(context, const MarketplaceScreen())),
           if (isEliteUser)
-            ListTile(
-              leading: const Icon(Icons.storefront_outlined),
-              title: const Text('Mi Escaparate Público'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PublicShowcaseScreen(),
-                  ),
-                );
-              },
-            ),
-          if (isEliteUser)
-            ListTile(
-              leading: const Icon(Icons.groups_outlined),
-              title: const Text('Gestionar Gallera'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const GalleraManagementScreen(),
-                  ),
-                );
-              },
-            ),
+            _buildDrawerItem(context,
+                icon: Icons.storefront_outlined,
+                title: 'Mi Escaparate Público',
+                onTap: () =>
+                    _navigateTo(context, const PublicShowcaseScreen())),
+          _buildDrawerSectionHeader(context, 'Mi Gallera'),
+          _buildDrawerItem(context,
+              icon: Icons.swap_horiz,
+              title: 'Cambiar Gallera',
+              onTap: () => _navigateTo(context, const GalleraSwitcherScreen())),
+          if (canManageGallera)
+            _buildDrawerItem(context,
+                icon: Icons.groups_outlined,
+                title: 'Gestionar Miembros',
+                onTap: () =>
+                    _navigateTo(context, const GalleraManagementScreen())),
+          if (canManageGallera)
+            _buildDrawerItem(context,
+                icon: Icons.map_outlined,
+                title: 'Gestionar Áreas',
+                onTap: () =>
+                    _navigateTo(context, const AreaManagementScreen())),
+          if (isMaestroOrHigher) ...[
+            _buildDrawerSectionHeader(context, 'Registros y Finanzas'),
+            _buildDrawerItem(context,
+                icon: Icons.auto_stories,
+                title: 'Libro de Cría',
+                onTap: () => _navigateTo(context, const BreedingListScreen())),
+            _buildDrawerItem(context,
+                icon: Icons.monetization_on_outlined,
+                title: 'Registro de Ventas',
+                onTap: () => _navigateTo(context, const SalesHistoryScreen())),
+            _buildDrawerItem(context,
+                icon: Icons.request_quote_outlined,
+                title: 'Registro de Gastos',
+                onTap: () => _navigateTo(
+                    context, const ExpensesScreen())), // <-- ENTRADA AÑADIDA
+          ],
+          _buildDrawerSectionHeader(context, 'Cuenta'),
+          _buildDrawerItem(context,
+              icon: Icons.account_circle_outlined,
+              title: 'Mi Perfil',
+              onTap: () => _navigateTo(context, const ProfileScreen())),
+          _buildDrawerItem(context,
+              icon: Icons.workspace_premium_outlined,
+              title: 'Planes y Suscripción',
+              onTap: () => _navigateTo(context, const SubscriptionScreen())),
+          const Divider(height: 24, thickness: 0.5),
           ListTile(
-            leading: const Icon(Icons.workspace_premium_outlined),
-            title: const Text('Planes y Suscripción'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SubscriptionScreen(),
-                ),
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: Icon(
-              Provider.of<ThemeProvider>(context).isDarkMode
-                  ? Icons.dark_mode_outlined
-                  : Icons.light_mode_outlined,
-            ),
+            leading: Icon(Provider.of<ThemeProvider>(context).isDarkMode
+                ? Icons.dark_mode_outlined
+                : Icons.light_mode_outlined),
             title: const Text('Tema Oscuro'),
             trailing: Switch(
               value:
@@ -586,13 +463,10 @@ class _HomeScreenState extends State<HomeScreen> {
               },
             ),
           ),
-          const Divider(),
           ListTile(
             leading: Icon(Icons.logout, color: Colors.red.shade400),
-            title: Text(
-              'Cerrar Sesión',
-              style: TextStyle(color: Colors.red.shade400),
-            ),
+            title: Text('Cerrar Sesión',
+                style: TextStyle(color: Colors.red.shade400)),
             onTap: () {
               Navigator.pop(context);
               signOut();
@@ -601,5 +475,94 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildDrawerHeader(BuildContext context, UserModel userProfile) {
+    return SizedBox(
+      height: 220,
+      child: DrawerHeader(
+        padding: const EdgeInsets.all(8.0),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12.0),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Transform.flip(
+                  flipX: true,
+                  child: Image.asset('assets/images/gallosinfondo.png',
+                      fit: BoxFit.cover,
+                      color: Colors.black.withOpacity(0.5),
+                      colorBlendMode: BlendMode.darken),
+                ),
+              ),
+              Positioned(
+                bottom: 12.0,
+                left: 12.0,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(userProfile.fullName,
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(blurRadius: 3, color: Colors.black)
+                            ])),
+                    const SizedBox(height: 4),
+                    Text(userProfile.email,
+                        style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                            shadows: [
+                              Shadow(blurRadius: 2, color: Colors.black)
+                            ])),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerSectionHeader(BuildContext context, String title) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      margin: const EdgeInsets.only(top: 12.0),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.05),
+      ),
+      child: Text(
+        title.toUpperCase(),
+        style: theme.textTheme.titleSmall?.copyWith(
+          color: theme.colorScheme.secondary,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.5,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerItem(BuildContext context,
+      {required IconData icon,
+      required String title,
+      required VoidCallback onTap}) {
+    return ListTile(
+      leading: Icon(icon, size: 22),
+      title: Text(title),
+      onTap: onTap,
+      dense: true,
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
+  void _navigateTo(BuildContext context, Widget screen) {
+    Navigator.pop(context);
+    Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
   }
 }

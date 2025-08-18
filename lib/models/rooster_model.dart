@@ -10,6 +10,9 @@ class RoosterModel {
   final Timestamp birthDate;
   final String imageUrl;
 
+  // --- ¡NUEVO CAMPO FUNDAMENTAL! ---
+  final String sex; // "macho" o "hembra"
+
   // Linaje
   final String? fatherId;
   final String? fatherName;
@@ -24,12 +27,17 @@ class RoosterModel {
   final String? combType;
   final String? legColor;
 
-  // --- ¡NUEVOS CAMPOS PARA VENTAS Y ESCAPARATE! ---
-  final double? salePrice; // Precio de venta establecido
-  final Timestamp? saleDate; // Fecha en la que se concretó la venta
-  final String? buyerName; // Nombre del comprador
-  final String? saleNotes; // Notas sobre la venta
-  final bool? showInShowcase; // (Élite) ¿Se muestra en el escaparate público?
+  // Venta
+  final double? salePrice;
+  final Timestamp? saleDate;
+  final String? buyerName;
+  final String? saleNotes;
+  final bool? showInShowcase;
+
+  // Físico y Ubicación
+  final double? weight;
+  final String? areaId;
+  final String? areaName;
 
   RoosterModel({
     required this.id,
@@ -37,6 +45,7 @@ class RoosterModel {
     required this.plate,
     required this.status,
     required this.birthDate,
+    required this.sex, // <-- AÑADIDO AL CONSTRUCTOR
     this.imageUrl = '',
     this.fatherId,
     this.fatherName,
@@ -48,12 +57,14 @@ class RoosterModel {
     this.color,
     this.combType,
     this.legColor,
-    // Añadimos al constructor
     this.salePrice,
     this.saleDate,
     this.buyerName,
     this.saleNotes,
     this.showInShowcase,
+    this.weight,
+    this.areaId,
+    this.areaName,
   });
 
   factory RoosterModel.fromFirestore(DocumentSnapshot doc) {
@@ -66,6 +77,8 @@ class RoosterModel {
       status: data['status'] ?? 'Desconocido',
       birthDate: data['birthDate'] ?? Timestamp.now(),
       imageUrl: data['imageUrl'] ?? '',
+      // Leemos el nuevo campo. Si no existe en un gallo antiguo, por defecto será "macho".
+      sex: data['sex'] ?? 'macho',
       fatherId: data['fatherId'],
       fatherName: data['fatherName'],
       motherId: data['motherId'],
@@ -76,38 +89,14 @@ class RoosterModel {
       color: data['color'],
       combType: data['combType'],
       legColor: data['legColor'],
-      // Leemos los nuevos campos
       salePrice: (data['salePrice'] as num?)?.toDouble(),
       saleDate: data['saleDate'],
       buyerName: data['buyerName'],
       saleNotes: data['saleNotes'],
       showInShowcase: data['showInShowcase'],
+      weight: (data['weight'] as num?)?.toDouble(),
+      areaId: data['areaId'],
+      areaName: data['areaName'],
     );
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'name': name,
-      'plate': plate,
-      'status': status,
-      'birthDate': birthDate,
-      'imageUrl': imageUrl,
-      'fatherId': fatherId,
-      'fatherName': fatherName,
-      'motherId': motherId,
-      'motherName': motherName,
-      'fatherLineageText': fatherLineageText,
-      'motherLineageText': motherLineageText,
-      'breedLine': breedLine,
-      'color': color,
-      'combType': combType,
-      'legColor': legColor,
-      'salePrice': salePrice,
-      'saleDate': saleDate,
-      'buyerName': buyerName,
-      'saleNotes': saleNotes,
-      'showInShowcase': showInShowcase,
-      'lastUpdate': FieldValue.serverTimestamp(),
-    };
   }
 }

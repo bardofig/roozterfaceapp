@@ -8,7 +8,6 @@ import 'package:roozterfaceapp/services/rooster_service.dart';
 
 class AddBreedingEventScreen extends StatefulWidget {
   final String galleraId;
-
   const AddBreedingEventScreen({super.key, required this.galleraId});
 
   @override
@@ -18,30 +17,31 @@ class AddBreedingEventScreen extends StatefulWidget {
 class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
   final _roosterService = RoosterService();
   final _breedingService = BreedingService();
-
-  // Controladores de texto
   final _notesController = TextEditingController();
   final _externalFatherController = TextEditingController();
   final _externalMotherController = TextEditingController();
-
-  // Estados
   DateTime? _selectedDate;
   RoosterModel? _selectedFather;
   RoosterModel? _selectedMother;
   bool _isLoading = false;
   bool _isExternalFather = false;
   bool _isExternalMother = false;
-
   late Future<List<RoosterModel>> _breedersFuture;
 
   @override
   void initState() {
     super.initState();
+    final List<String> breedableStatuses = [
+      'activo',
+      'en venta',
+      'descansando'
+    ];
     _breedersFuture = _roosterService
         .getRoostersStream(widget.galleraId)
         .first
-        .then((roosters) =>
-            roosters.where((r) => r.status.toLowerCase() == 'activo').toList());
+        .then((roosters) => roosters
+            .where((r) => breedableStatuses.contains(r.status.toLowerCase()))
+            .toList());
   }
 
   @override
@@ -54,11 +54,10 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? DateTime.now(),
-      firstDate: DateTime(2000),
-      lastDate: DateTime.now(),
-    );
+        context: context,
+        initialDate: _selectedDate ?? DateTime.now(),
+        firstDate: DateTime(2000),
+        lastDate: DateTime.now());
     if (picked != null) {
       setState(() {
         _selectedDate = picked;
@@ -67,15 +66,14 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
   }
 
   Future<void> _saveEvent() async {
-    // Validación
     if ((_selectedFather == null && !_isExternalFather) ||
-        (_externalFatherController.text.isEmpty && _isExternalFather)) {
+        (_externalFatherController.text.trim().isEmpty && _isExternalFather)) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Por favor, especifica un padre.')));
       return;
     }
     if ((_selectedMother == null && !_isExternalMother) ||
-        (_externalMotherController.text.isEmpty && _isExternalMother)) {
+        (_externalMotherController.text.trim().isEmpty && _isExternalMother)) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Por favor, especifica una madre.')));
       return;
@@ -83,6 +81,14 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
     if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Por favor, selecciona una fecha.')));
+      return;
+    }
+    if (!_isExternalFather &&
+        !_isExternalMother &&
+        _selectedFather?.id == _selectedMother?.id) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content:
+              Text('El padre y la madre no pueden ser el mismo ejemplar.')));
       return;
     }
 
@@ -94,16 +100,13 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
       await _breedingService.addBreedingEvent(
         galleraId: widget.galleraId,
         eventDate: _selectedDate!,
-        notes: _notesController.text,
-        // Pasa el padre interno o nulo
+        notes: _notesController.text.trim(),
         father: _isExternalFather ? null : _selectedFather,
-        // Pasa la madre interna o nula
         mother: _isExternalMother ? null : _selectedMother,
-        // Pasa la descripción externa o nula
         externalFatherLineage:
-            _isExternalFather ? _externalFatherController.text : null,
+            _isExternalFather ? _externalFatherController.text.trim() : null,
         externalMotherLineage:
-            _isExternalMother ? _externalMotherController.text : null,
+            _isExternalMother ? _externalMotherController.text.trim() : null,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -131,20 +134,24 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
       body: FutureBuilder<List<RoosterModel>>(
         future: _breedersFuture,
         builder: (context, snapshot) {
-          if (!snapshot.hasData) {
+          if (!snapshot.hasData)
             return const Center(child: CircularProgressIndicator());
-          }
-          final breeders = snapshot.data!;
+          if (snapshot.hasError)
+            return Center(
+                child: Text('Error al cargar ejemplares: ${snapshot.error}'));
+
+          final sires = snapshot.data!.where((r) => r.sex == 'macho').toList();
+          final dams = snapshot.data!.where((r) => r.sex == 'hembra').toList();
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Sección del Padre
                 Text("Semental (Padre)",
                     style: Theme.of(context).textTheme.titleMedium),
                 SwitchListTile(
-                  title: const Text('Padre Externo (No registrado)'),
+                  title: const Text('Padre no está registrado / Es externo'),
                   value: _isExternalFather,
                   onChanged: (value) {
                     setState(() {
@@ -155,18 +162,17 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
                 ),
                 if (_isExternalFather)
                   TextField(
-                    controller: _externalFatherController,
-                    decoration: const InputDecoration(
-                        labelText: 'Descripción del Padre Externo'),
-                    textCapitalization: TextCapitalization.words,
-                  )
+                      controller: _externalFatherController,
+                      decoration: const InputDecoration(
+                          labelText: 'Descripción del Padre Externo'),
+                      textCapitalization: TextCapitalization.words)
                 else
                   DropdownButtonFormField<RoosterModel>(
                     value: _selectedFather,
                     decoration: const InputDecoration(
                         labelText: 'Seleccionar Semental Registrado'),
                     isExpanded: true,
-                    items: breeders
+                    items: sires
                         .map((r) => DropdownMenuItem<RoosterModel>(
                             value: r, child: Text('${r.name} (${r.plate})')))
                         .toList(),
@@ -176,14 +182,11 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
                       });
                     },
                   ),
-
                 const Divider(height: 32),
-
-                // Sección de la Madre
                 Text("Gallina (Madre)",
                     style: Theme.of(context).textTheme.titleMedium),
                 SwitchListTile(
-                  title: const Text('Madre Externa (No registrada)'),
+                  title: const Text('Madre no está registrada / Es externa'),
                   value: _isExternalMother,
                   onChanged: (value) {
                     setState(() {
@@ -194,18 +197,17 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
                 ),
                 if (_isExternalMother)
                   TextField(
-                    controller: _externalMotherController,
-                    decoration: const InputDecoration(
-                        labelText: 'Descripción de la Madre Externa'),
-                    textCapitalization: TextCapitalization.words,
-                  )
+                      controller: _externalMotherController,
+                      decoration: const InputDecoration(
+                          labelText: 'Descripción de la Madre Externa'),
+                      textCapitalization: TextCapitalization.words)
                 else
                   DropdownButtonFormField<RoosterModel>(
                     value: _selectedMother,
                     decoration: const InputDecoration(
                         labelText: 'Seleccionar Gallina Registrada'),
                     isExpanded: true,
-                    items: breeders
+                    items: dams
                         .map((r) => DropdownMenuItem<RoosterModel>(
                             value: r, child: Text('${r.name} (${r.plate})')))
                         .toList(),
@@ -215,29 +217,23 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
                       });
                     },
                   ),
-
                 const Divider(height: 32),
-
-                // Sección de Fecha y Notas
-                Row(
-                  children: [
-                    Expanded(
-                        child: Text(_selectedDate == null
-                            ? 'Fecha de la Cruza'
-                            : 'Fecha: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)}')),
-                    TextButton(
-                        onPressed: () => _selectDate(context),
-                        child: const Text('Seleccionar')),
-                  ],
-                ),
+                Row(children: [
+                  Expanded(
+                      child: Text(_selectedDate == null
+                          ? 'Fecha de la Cruza *'
+                          : 'Fecha: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)}')),
+                  TextButton(
+                      onPressed: () => _selectDate(context),
+                      child: const Text('Seleccionar')),
+                ]),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: _notesController,
-                  decoration:
-                      const InputDecoration(labelText: 'Notas Adicionales'),
-                  maxLines: 3,
-                  textCapitalization: TextCapitalization.sentences,
-                ),
+                    controller: _notesController,
+                    decoration:
+                        const InputDecoration(labelText: 'Notas Adicionales'),
+                    maxLines: 3,
+                    textCapitalization: TextCapitalization.sentences),
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
@@ -246,7 +242,7 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
                     style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16)),
                     child: _isLoading
-                        ? const CircularProgressIndicator()
+                        ? const CircularProgressIndicator(color: Colors.white)
                         : const Text('Guardar Cruza'),
                   ),
                 ),

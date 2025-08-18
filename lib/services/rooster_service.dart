@@ -95,6 +95,7 @@ class RoosterService {
     required String plate,
     required String status,
     required DateTime birthDate,
+    required String sex,
     required File imageFile,
     String? fatherId,
     String? fatherName,
@@ -108,10 +109,14 @@ class RoosterService {
     String? legColor,
     double? salePrice,
     bool? showInShowcase,
+    double? weight,
+    String? areaId,
+    String? areaName,
   }) async {
     if (currentUserId == null) throw Exception("Usuario no autenticado.");
+    // --- ¡RUTA DE ARCHIVO CORREGIDA Y DEFINITIVA! ---
     String filePath =
-        'users/$currentUserId/galleras/$galleraId/gallos/${DateTime.now().millisecondsSinceEpoch}.jpg';
+        'users/$currentUserId/gallos/${DateTime.now().millisecondsSinceEpoch}.jpg';
     Reference photoRef = _storage.ref().child(filePath);
     try {
       UploadTask uploadTask = photoRef.putFile(imageFile);
@@ -124,6 +129,7 @@ class RoosterService {
         'status': status,
         'birthDate': Timestamp.fromDate(birthDate),
         'imageUrl': downloadUrl,
+        'sex': sex,
         'createdAt': FieldValue.serverTimestamp(),
         'lastUpdate': FieldValue.serverTimestamp(),
         'fatherId': fatherId,
@@ -141,6 +147,9 @@ class RoosterService {
         'saleDate': null,
         'buyerName': null,
         'saleNotes': null,
+        'weight': weight,
+        'areaId': areaId,
+        'areaName': areaName,
       };
       await _roostersCollection(galleraId).add(roosterData);
     } catch (e) {
@@ -149,7 +158,7 @@ class RoosterService {
       } catch (deleteError) {
         print("Error en compensación: $deleteError");
       }
-      throw Exception("Ocurrió un error al guardar los datos.");
+      throw Exception("Ocurrió un error al guardar los datos: ${e.toString()}");
     }
   }
 
@@ -160,6 +169,7 @@ class RoosterService {
     required String plate,
     required String status,
     required DateTime birthDate,
+    required String sex,
     File? newImageFile,
     String? existingImageUrl,
     String? fatherId,
@@ -177,14 +187,18 @@ class RoosterService {
     String? buyerName,
     String? saleNotes,
     bool? showInShowcase,
+    double? weight,
+    String? areaId,
+    String? areaName,
   }) async {
     if (currentUserId == null) throw Exception("Usuario no autenticado.");
     String imageUrl = existingImageUrl ?? '';
     Reference? newPhotoRef;
     try {
       if (newImageFile != null) {
+        // --- ¡NUEVA RUTA! ---
         String filePath =
-            'users/$currentUserId/galleras/$galleraId/gallos/${DateTime.now().millisecondsSinceEpoch}.jpg';
+            'users/$currentUserId/gallos/${DateTime.now().millisecondsSinceEpoch}.jpg';
         newPhotoRef = _storage.ref().child(filePath);
         UploadTask uploadTask = newPhotoRef.putFile(newImageFile);
         TaskSnapshot snapshot = await uploadTask;
@@ -196,6 +210,7 @@ class RoosterService {
         'status': status,
         'birthDate': Timestamp.fromDate(birthDate),
         'imageUrl': imageUrl,
+        'sex': sex,
         'lastUpdate': FieldValue.serverTimestamp(),
         'fatherId': fatherId,
         'fatherName': fatherName,
@@ -212,16 +227,20 @@ class RoosterService {
         'buyerName': buyerName,
         'saleNotes': saleNotes,
         'showInShowcase': showInShowcase,
+        'weight': weight,
+        'areaId': areaId,
+        'areaName': areaName,
       };
 
-      updatedData.removeWhere((key, value) => value == null);
-
       await _roostersCollection(galleraId).doc(roosterId).update(updatedData);
+
       if (newImageFile != null &&
           existingImageUrl != null &&
           existingImageUrl.isNotEmpty) {
         try {
-          await _storage.refFromURL(existingImageUrl).delete();
+          if (existingImageUrl.contains('firebasestorage.googleapis.com')) {
+            await _storage.refFromURL(existingImageUrl).delete();
+          }
         } catch (e) {
           print("No se pudo borrar imagen antigua: $e");
         }
@@ -230,7 +249,8 @@ class RoosterService {
       if (newPhotoRef != null) {
         await newPhotoRef.delete();
       }
-      throw Exception("Ocurrió un error al actualizar los datos.");
+      throw Exception(
+          "Ocurrió un error al actualizar los datos: ${e.toString()}");
     }
   }
 
@@ -240,7 +260,9 @@ class RoosterService {
   }) async {
     if (rooster.imageUrl.isNotEmpty) {
       try {
-        await _storage.refFromURL(rooster.imageUrl).delete();
+        if (rooster.imageUrl.contains('firebasestorage.googleapis.com')) {
+          await _storage.refFromURL(rooster.imageUrl).delete();
+        }
       } catch (e) {
         print("Error al borrar imagen de Storage: $e");
       }
@@ -248,11 +270,14 @@ class RoosterService {
     await _roostersCollection(galleraId).doc(rooster.id).delete();
   }
 
-  // Obtiene el historial de gallos marcados como "Vendido"
   Stream<List<RoosterModel>> getSalesHistoryStream(String galleraId) {
     if (galleraId.isEmpty) return Stream.value([]);
+    final now = DateTime.now();
+    final startOfYear = DateTime(now.year, 1, 1);
+    final startOfYearTimestamp = Timestamp.fromDate(startOfYear);
     return _roostersCollection(galleraId)
         .where('status', isEqualTo: 'Vendido')
+        .where('saleDate', isGreaterThanOrEqualTo: startOfYearTimestamp)
         .orderBy('saleDate', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
@@ -260,7 +285,6 @@ class RoosterService {
             .toList());
   }
 
-  // Obtiene los gallos marcados para mostrar en el escaparate público
   Stream<List<RoosterModel>> getShowcaseRoostersStream(String galleraId) {
     if (galleraId.isEmpty) return Stream.value([]);
     return _roostersCollection(galleraId)

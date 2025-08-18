@@ -3,10 +3,13 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:roozterfaceapp/models/chat_message_model.dart';
+import 'package:roozterfaceapp/models/user_model.dart';
+import 'package:roozterfaceapp/services/user_service.dart';
 
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
+  final UserService _userService = UserService();
 
   String getChatRoomId(String otherUserId) {
     final currentUserId = _auth.currentUser!.uid;
@@ -15,14 +18,12 @@ class ChatService {
     return ids.join('_');
   }
 
-  /// Envía un mensaje y actualiza el resumen del chat.
-  /// Ahora recibe el nombre del usuario actual como parámetro.
   Future<void> sendMessage({
     required String recipientId,
     required String messageText,
     required String subjectRoosterName,
     required String recipientName,
-    required String currentUserName, // <-- EL COMANDANTE PROVEE ESTE DATO
+    required String currentUserName,
   }) async {
     final currentUser = _auth.currentUser!;
     if (messageText.trim().isEmpty) return;
@@ -38,11 +39,10 @@ class ChatService {
     final chatRoomRef = _firestore.collection('chats').doc(chatRoomId);
     final messageRef = chatRoomRef.collection('messages').doc();
 
-    // Usamos una transacción para garantizar la consistencia de los datos
     await _firestore.runTransaction((transaction) async {
       final chatDoc = await transaction.get(chatRoomRef);
 
-      final chatSummaryData = {
+      Map<String, dynamic> chatSummaryData = {
         'participants': [currentUser.uid, recipientId],
         'participantNames': {
           currentUser.uid: currentUserName,
@@ -52,11 +52,13 @@ class ChatService {
         'lastMessageText': newMessage.text,
         'lastMessageTimestamp': newMessage.timestamp,
         'lastMessageSenderId': currentUser.uid,
+        'deleted_up_to': {
+          recipientId: FieldValue.delete(),
+        },
       };
 
       if (!chatDoc.exists) {
         transaction.set(chatRoomRef, chatSummaryData);
-        // También marcamos como leído por el emisor al crear
         transaction.set(
             chatRoomRef,
             {
@@ -64,41 +66,59 @@ class ChatService {
             },
             SetOptions(merge: true));
       } else {
-        transaction.update(chatRoomRef, chatSummaryData);
+        transaction.set(chatRoomRef, chatSummaryData, SetOptions(merge: true));
       }
 
       transaction.set(messageRef, newMessage.toMap());
     });
   }
 
-  /// Actualiza el timestamp del último mensaje leído por el usuario actual.
   Future<void> markChatAsRead(String chatRoomId) async {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return;
 
     await _firestore.collection('chats').doc(chatRoomId).set({
-      'lastMessageReadBy': {currentUserId: Timestamp.now()},
+      'lastMessageReadBy': {currentUserId: FieldValue.serverTimestamp()},
     }, SetOptions(merge: true));
   }
 
-  /// Obtiene el stream de mensajes para una sala de chat específica.
-  Stream<QuerySnapshot> getMessages(String chatRoomId) {
-    return _firestore
+  Future<void> deleteChatForCurrentUser(String chatRoomId) async {
+    final currentUserId = _auth.currentUser?.uid;
+    if (currentUserId == null) return;
+
+    final chatRoomRef = _firestore.collection('chats').doc(chatRoomId);
+
+    await chatRoomRef.set({
+      'deleted_up_to': {
+        currentUserId: FieldValue.serverTimestamp(),
+      },
+    }, SetOptions(merge: true));
+  }
+
+  Stream<DocumentSnapshot> getChatRoomStream(String chatRoomId) {
+    return _firestore.collection('chats').doc(chatRoomId).snapshots();
+  }
+
+  Stream<QuerySnapshot> getMessages(String chatRoomId, Timestamp? deletedUpTo) {
+    Query query = _firestore
         .collection('chats')
         .doc(chatRoomId)
         .collection('messages')
-        .orderBy('timestamp', descending: true)
-        .snapshots();
+        .orderBy('timestamp', descending: true);
+
+    if (deletedUpTo != null) {
+      query = query.where('timestamp', isGreaterThan: deletedUpTo);
+    }
+
+    return query.snapshots();
   }
 
-  /// Obtiene todas las conversaciones en las que participa el usuario actual.
   Stream<QuerySnapshot> getChatListStream() {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return const Stream.empty();
 
     return _firestore
         .collection('chats')
-        .where('participants', arrayContains: currentUserId)
         .orderBy('lastMessageTimestamp', descending: true)
         .snapshots();
   }

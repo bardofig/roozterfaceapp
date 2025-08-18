@@ -2,7 +2,7 @@
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart'; // Importamos para formatear números
+import 'package:intl/intl.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
 
 class RoosterTile extends StatelessWidget {
@@ -37,7 +37,6 @@ class RoosterTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Formateamos el precio para mostrarlo
     final String priceDisplay =
         rooster.salePrice != null && rooster.salePrice! > 0
             ? NumberFormat.currency(locale: 'es_MX', symbol: '\$')
@@ -73,15 +72,34 @@ class RoosterTile extends StatelessWidget {
                         fit: BoxFit.cover,
                         width: 50,
                         height: 50,
+                        placeholder: (ctx, url) =>
+                            const CircularProgressIndicator(strokeWidth: 2),
+                        errorWidget: (ctx, url, err) => const Icon(Icons.error),
                       ),
                     )
-                  : Icon(Icons.shield_outlined,
+                  : Icon(rooster.sex == 'hembra' ? Icons.female : Icons.male,
                       color: theme.colorScheme.onSurface.withOpacity(0.6)),
             ),
           ),
-          title: Text(
-            rooster.name,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          title: Row(
+            children: [
+              Icon(
+                rooster.sex == 'hembra' ? Icons.female : Icons.male,
+                color: rooster.sex == 'hembra'
+                    ? Colors.pink.shade300
+                    : Colors.blue.shade400,
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  rooster.name,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
           subtitle: Text(
               'Placa: ${rooster.plate.isNotEmpty ? rooster.plate : "N/A"}'),
@@ -99,13 +117,11 @@ class RoosterTile extends StatelessWidget {
                 child: Text(
                   rooster.status,
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                  ),
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold),
                 ),
               ),
-              // --- ¡AQUÍ MOSTRAMOS EL PRECIO! ---
               if (rooster.status.toLowerCase() == 'en venta' &&
                   priceDisplay.isNotEmpty)
                 Padding(
@@ -113,10 +129,9 @@ class RoosterTile extends StatelessWidget {
                   child: Text(
                     priceDisplay,
                     style: TextStyle(
-                      color: Colors.green.shade700,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                    ),
+                        color: Colors.green.shade700,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14),
                   ),
                 ),
             ],
