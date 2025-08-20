@@ -15,10 +15,12 @@ class FightModel {
   final String? preparationNotes;
   final String? postFightNotes;
 
-  // --- ¡NUEVOS CAMPOS ENRIQUECIDOS! ---
   final String? weaponType;
   final String? fightDuration;
   final String? injuriesSustained;
+
+  // --- ¡NUEVO CAMPO FINANCIERO! ---
+  final double? netProfit; // Ganancia o pérdida neta del evento
 
   FightModel({
     required this.id,
@@ -33,6 +35,7 @@ class FightModel {
     this.weaponType,
     this.fightDuration,
     this.injuriesSustained,
+    this.netProfit, // <-- AÑADIDO AL CONSTRUCTOR
   });
 
   factory FightModel.fromFirestore(DocumentSnapshot doc) {
@@ -50,6 +53,8 @@ class FightModel {
       weaponType: data['weaponType'],
       fightDuration: data['fightDuration'],
       injuriesSustained: data['injuriesSustained'],
+      // Leemos el nuevo campo
+      netProfit: (data['netProfit'] as num?)?.toDouble(),
     );
   }
 }

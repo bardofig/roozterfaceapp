@@ -10,45 +10,53 @@ class RoosterListProvider with ChangeNotifier {
   StreamSubscription? _roosterSubscription;
 
   List<RoosterModel> _roosters = [];
-  bool _isLoading = true; // Inicia como cargando por defecto
+  bool _isLoading = true; // Inicia como 'true' por defecto
   String? _currentGalleraId;
 
+  // --- Getters públicos
   List<RoosterModel> get roosters => _roosters;
   bool get isLoading => _isLoading;
+  String? get currentGalleraId => _currentGalleraId;
 
-  /// Ordena al proveedor buscar y escuchar la lista de gallos de una gallera específica.
-  /// Si el galleraId es el mismo que ya está escuchando, no hace nada.
   void fetchRoosters(String? galleraId) {
+    // Si la gallera es la misma, no hacemos nada.
     if (galleraId == _currentGalleraId) {
-      return; // Ya estamos escuchando a esta gallera, no hay acción necesaria.
-    }
-
-    _currentGalleraId = galleraId;
-    _roosterSubscription
-        ?.cancel(); // Siempre cancelamos la suscripción anterior
-
-    if (_currentGalleraId == null || _currentGalleraId!.isEmpty) {
-      // Caso: No hay gallera activa (ej. el usuario acaba de ser eliminado de una)
-      _roosters = [];
-      _isLoading = false;
-      notifyListeners();
       return;
     }
 
-    // Iniciamos la nueva operación de carga
+    _currentGalleraId = galleraId;
+    _roosterSubscription?.cancel();
+
+    // Caso: No hay gallera activa.
+    if (_currentGalleraId == null || _currentGalleraId!.isEmpty) {
+      _roosters = [];
+      // Nos aseguramos de que el indicador de carga se quite.
+      if (_isLoading) {
+        _isLoading = false;
+        notifyListeners();
+      }
+      return;
+    }
+
+    // --- PUNTO CRÍTICO DE LA CORRECCIÓN ---
+    // ANTES de suscribirnos al nuevo stream, ANUNCIAMOS que una nueva carga va a comenzar.
+    // Esto asegura que la HomeScreen muestre el indicador de carga ANTES de recibir la lista.
     _isLoading = true;
-    notifyListeners();
+    _roosters =
+        []; // Vaciamos la lista vieja para que no se muestren datos incorrectos mientras carga.
+    notifyListeners(); // FORZAMOS la reconstrucción de la UI al estado de carga.
 
     _roosterSubscription = _roosterService
         .getRoostersStream(_currentGalleraId!)
         .listen((roostersData) {
       _roosters = roostersData;
-      _isLoading = false;
-      notifyListeners();
+      _isLoading =
+          false; // Al recibir datos (incluso una lista vacía), ANUNCIAMOS que la carga ha terminado.
+      notifyListeners(); // Notificamos a la UI para que se reconstruya con los nuevos datos Y SIN el indicador.
     }, onError: (error) {
-      print("Error catastrófico en RoosterListProvider: $error");
-      _roosters = []; // En caso de error (ej. permisos), vaciamos la lista
-      _isLoading = false;
+      print("Error en el stream de RoosterListProvider: $error");
+      _roosters = [];
+      _isLoading = false; // También terminamos la carga si hay un error.
       notifyListeners();
     });
   }

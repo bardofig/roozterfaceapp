@@ -17,25 +17,38 @@ class ExpensesScreen extends StatefulWidget {
 class _ExpensesScreenState extends State<ExpensesScreen> {
   final ExpenseService _expenseService = ExpenseService();
 
-  final List<String> _expenseCategories = [
-    'Alimentación',
-    'Medicina',
-    'Instalaciones',
-    'Transporte',
-    'Compra de Ejemplar',
-    'Otro'
-  ];
+  DateTime? _startDate;
+  DateTime? _endDate;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _startDate = DateTime(now.year, now.month, 1);
+    _endDate = DateTime(now.year, now.month, now.day);
+  }
 
   void _showExpenseDialog({ExpenseModel? expenseToEdit}) {
     final formKey = GlobalKey<FormState>();
     final descController =
         TextEditingController(text: expenseToEdit?.description ?? '');
     final amountController = TextEditingController(
-        text: expenseToEdit?.amount.toStringAsFixed(2) ?? '');
+        text: expenseToEdit != null
+            ? expenseToEdit.amount.toStringAsFixed(2)
+            : '');
     String selectedCategory = expenseToEdit?.category ?? 'Alimentación';
     DateTime selectedDate =
         expenseToEdit?.expenseDate.toDate() ?? DateTime.now();
     final bool isEditing = expenseToEdit != null;
+
+    final List<String> expenseCategories = [
+      'Alimentación',
+      'Medicina',
+      'Instalaciones',
+      'Transporte',
+      'Compra de Ejemplar',
+      'Otro'
+    ];
 
     showDialog(
       context: context,
@@ -58,7 +71,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         value: selectedCategory,
                         decoration:
                             const InputDecoration(labelText: 'Categoría'),
-                        items: _expenseCategories
+                        items: expenseCategories
                             .map((cat) =>
                                 DropdownMenuItem(value: cat, child: Text(cat)))
                             .toList(),
@@ -103,11 +116,10 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             child: const Text('Cambiar'),
                             onPressed: () async {
                               final pickedDate = await showDatePicker(
-                                context: context,
-                                initialDate: selectedDate,
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime.now(),
-                              );
+                                  context: context,
+                                  initialDate: selectedDate,
+                                  firstDate: DateTime(2020),
+                                  lastDate: DateTime.now());
                               if (pickedDate != null) {
                                 setDialogState(() => selectedDate = pickedDate);
                               }
@@ -121,15 +133,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancelar'),
-                ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar')),
                 ElevatedButton(
                   onPressed: () async {
                     if (formKey.currentState!.validate()) {
                       try {
-                        // El servicio para 'update' no existe aún, usaremos add por ahora.
-                        // En una futura iteración se añadiría update a ExpenseService.
+                        // TODO: Implementar updateExpense en ExpenseService
                         await _expenseService.addExpense(
                           galleraId: activeGalleraId,
                           date: selectedDate,
@@ -140,15 +150,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         if (mounted) Navigator.of(context).pop();
                       } catch (e) {
                         if (mounted)
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                                content: Text('Error: ${e.toString()}'),
-                                backgroundColor: Colors.red),
-                          );
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                              content: Text('Error: ${e.toString()}'),
+                              backgroundColor: Colors.red));
                       }
                     }
                   },
-                  child: const Text('Guardar Gasto'),
+                  child: const Text('Guardar'),
                 ),
               ],
             );
@@ -156,6 +164,25 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         );
       },
     );
+  }
+
+  Future<void> _selectDate(BuildContext context,
+      {required bool isStartDate}) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: (isStartDate ? _startDate : _endDate) ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isStartDate) {
+          _startDate = picked;
+        } else {
+          _endDate = picked;
+        }
+      });
+    }
   }
 
   @override
@@ -169,69 +196,209 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Registro de Gastos'),
-      ),
+      appBar: AppBar(title: const Text('Registro de Gastos')),
       floatingActionButton: FloatingActionButton(
-        onPressed: _showExpenseDialog,
-        child: const Icon(Icons.add),
-        tooltip: 'Registrar Gasto',
+          onPressed: _showExpenseDialog,
+          child: const Icon(Icons.add),
+          tooltip: 'Registrar Gasto'),
+      body: Column(
+        children: [
+          _buildDateFilter(),
+          Expanded(
+            child: StreamBuilder<List<ExpenseModel>>(
+              stream: _expenseService.getExpensesStream(
+                  galleraId: activeGalleraId,
+                  startDate: _startDate,
+                  endDate: _endDate),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting)
+                  return const Center(child: CircularProgressIndicator());
+                if (snapshot.hasError) {
+                  String errorMessage =
+                      'Error al cargar gastos: ${snapshot.error}';
+                  if (snapshot.error.toString().contains('requires an index')) {
+                    errorMessage =
+                        'La base de datos requiere un nuevo índice. Ejecuta la app en modo debug y sigue el enlace en la consola para crearlo.';
+                  }
+                  return Center(
+                      child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child:
+                              Text(errorMessage, textAlign: TextAlign.center)));
+                }
+
+                final expenses = snapshot.data ?? [];
+                final double totalExpenses =
+                    expenses.fold(0.0, (sum, item) => sum + item.amount);
+
+                return Column(
+                  children: [
+                    _buildSummaryCard(totalExpenses),
+                    if (expenses.isEmpty)
+                      const Expanded(
+                          child: Center(
+                        child: Text('No hay gastos en el período seleccionado.',
+                            style: TextStyle(fontSize: 16, color: Colors.grey)),
+                      ))
+                    else
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.only(bottom: 80),
+                          itemCount: expenses.length,
+                          itemBuilder: (context, index) {
+                            final expense = expenses[index];
+                            return Dismissible(
+                              key: Key(expense.id),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                  color: Colors.red.shade700,
+                                  alignment: Alignment.centerRight,
+                                  padding: const EdgeInsets.only(right: 20),
+                                  child: const Icon(Icons.delete_forever,
+                                      color: Colors.white)),
+                              confirmDismiss: (direction) async {
+                                final confirm = await showDialog<bool>(
+                                    context: context,
+                                    builder: (_) => AlertDialog(
+                                            title:
+                                                const Text("Confirmar Borrado"),
+                                            content: Text(
+                                                "¿Seguro que quieres borrar este gasto: \"${expense.description}\"?"),
+                                            actions: [
+                                              TextButton(
+                                                  child: const Text("Cancelar"),
+                                                  onPressed: () =>
+                                                      Navigator.of(context)
+                                                          .pop(false)),
+                                              TextButton(
+                                                  child: const Text("Borrar"),
+                                                  style: TextButton.styleFrom(
+                                                      foregroundColor:
+                                                          Colors.red),
+                                                  onPressed: () =>
+                                                      Navigator.of(context)
+                                                          .pop(true)),
+                                            ]));
+                                return confirm ?? false;
+                              },
+                              onDismissed: (direction) {
+                                _expenseService.deleteExpense(
+                                    galleraId: activeGalleraId,
+                                    expenseId: expense.id);
+                              },
+                              child: Card(
+                                margin: const EdgeInsets.symmetric(
+                                    horizontal: 12, vertical: 6),
+                                child: ListTile(
+                                  leading: CircleAvatar(
+                                      child: Icon(_getIconForCategory(
+                                          expense.category))),
+                                  title: Text(expense.description,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis),
+                                  subtitle: Text(expense.category),
+                                  trailing: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                          NumberFormat.currency(
+                                                  locale: 'es_MX', symbol: '\$')
+                                              .format(expense.amount),
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.redAccent)),
+                                      Text(
+                                          DateFormat('dd/MM/yy').format(
+                                              expense.expenseDate.toDate()),
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodySmall),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
-      body: StreamBuilder<List<ExpenseModel>>(
-        stream: _expenseService.getExpensesStream(activeGalleraId),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData)
-            return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError)
-            return Center(child: Text('Error: ${snapshot.error}'));
+    );
+  }
 
-          final expenses = snapshot.data!;
-          if (expenses.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                    'No has registrado ningún gasto.\nPresiona el botón "+" para empezar.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 18, color: Colors.grey)),
-              ),
-            );
-          }
+  Widget _buildDateFilter() {
+    final dateFormat = DateFormat('dd/MM/yyyy');
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      child: Row(
+        children: [
+          Expanded(
+              child: InkWell(
+            onTap: () => _selectDate(context, isStartDate: true),
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                  labelText: 'Desde', border: OutlineInputBorder()),
+              child: Text(_startDate != null
+                  ? dateFormat.format(_startDate!)
+                  : 'Seleccionar'),
+            ),
+          )),
+          const SizedBox(width: 8),
+          Expanded(
+              child: InkWell(
+            onTap: () => _selectDate(context, isStartDate: false),
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                  labelText: 'Hasta', border: OutlineInputBorder()),
+              child: Text(_endDate != null
+                  ? dateFormat.format(_endDate!)
+                  : 'Seleccionar'),
+            ),
+          )),
+        ],
+      ),
+    );
+  }
 
-          return ListView.builder(
-            itemCount: expenses.length,
-            itemBuilder: (context, index) {
-              final expense = expenses[index];
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    child: Icon(_getIconForCategory(expense.category)),
-                  ),
-                  title: Text(expense.description),
-                  subtitle: Text(expense.category),
-                  trailing: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        NumberFormat.currency(locale: 'es_MX', symbol: '\$')
-                            .format(expense.amount),
-                        style: const TextStyle(
-                            fontWeight: FontWeight.bold, color: Colors.red),
-                      ),
-                      Text(
-                        DateFormat('dd/MM/yy')
-                            .format(expense.expenseDate.toDate()),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
+  Widget _buildSummaryCard(double totalAmount) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16.0),
+      margin: const EdgeInsets.all(12.0),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12.0),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              spreadRadius: 1,
+              blurRadius: 10,
+              offset: const Offset(0, 4))
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(
+            'TOTAL DE GASTOS (PERÍODO)',
+            style: theme.textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+                letterSpacing: 1.2),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            NumberFormat.currency(locale: 'es_MX', symbol: '\$')
+                .format(totalAmount),
+            style: theme.textTheme.displaySmall?.copyWith(
+                color: Colors.redAccent, fontWeight: FontWeight.bold),
+          ),
+        ],
       ),
     );
   }

@@ -6,7 +6,6 @@ import 'package:roozterfaceapp/models/expense_model.dart';
 class ExpenseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Apunta a la subcolección de gastos dentro de una gallera específica.
   CollectionReference _expensesCollection(String galleraId) {
     return _firestore
         .collection('galleras')
@@ -14,17 +13,38 @@ class ExpenseService {
         .collection('expenses');
   }
 
-  /// Obtiene un stream de todos los gastos de una gallera, ordenados por fecha.
-  Stream<List<ExpenseModel>> getExpensesStream(String galleraId) {
+  /// --- MÉTODO MODIFICADO PARA ACEPTAR RANGO DE FECHAS ---
+  /// Obtiene un stream de gastos de una gallera, opcionalmente filtrados por fecha.
+  Stream<List<ExpenseModel>> getExpensesStream({
+    required String galleraId,
+    DateTime? startDate,
+    DateTime? endDate,
+  }) {
     if (galleraId.isEmpty) {
       return Stream.value([]);
     }
-    return _expensesCollection(galleraId)
-        .orderBy('expenseDate', descending: true)
-        .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => ExpenseModel.fromFirestore(doc))
-            .toList());
+
+    // Empezamos con la consulta base, ordenada por fecha
+    Query query =
+        _expensesCollection(galleraId).orderBy('expenseDate', descending: true);
+
+    // Si se proporciona una fecha de inicio, la añadimos a la consulta
+    if (startDate != null) {
+      query = query.where('expenseDate',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+    }
+
+    // Si se proporciona una fecha de fin, la añadimos a la consulta
+    if (endDate != null) {
+      // Para incluir el día completo, nos aseguramos de que sea hasta el final del día
+      DateTime endOfDay =
+          DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+      query = query.where('expenseDate',
+          isLessThanOrEqualTo: Timestamp.fromDate(endOfDay));
+    }
+
+    return query.snapshots().map((snapshot) =>
+        snapshot.docs.map((doc) => ExpenseModel.fromFirestore(doc)).toList());
   }
 
   /// Añade un nuevo registro de gasto a la gallera.

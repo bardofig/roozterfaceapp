@@ -3,13 +3,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:roozterfaceapp/models/chat_message_model.dart';
-import 'package:roozterfaceapp/models/user_model.dart';
-import 'package:roozterfaceapp/services/user_service.dart';
 
 class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final UserService _userService = UserService();
 
   String getChatRoomId(String otherUserId) {
     final currentUserId = _auth.currentUser!.uid;
@@ -42,6 +39,7 @@ class ChatService {
     await _firestore.runTransaction((transaction) async {
       final chatDoc = await transaction.get(chatRoomRef);
 
+      // Usamos 'participants' consistentemente
       Map<String, dynamic> chatSummaryData = {
         'participants': [currentUser.uid, recipientId],
         'participantNames': {
@@ -53,6 +51,7 @@ class ChatService {
         'lastMessageTimestamp': newMessage.timestamp,
         'lastMessageSenderId': currentUser.uid,
         'deleted_up_to': {
+          // Asegura que el chat reaparezca para el otro usuario si estaba borrado para él
           recipientId: FieldValue.delete(),
         },
       };
@@ -88,11 +87,11 @@ class ChatService {
 
     final chatRoomRef = _firestore.collection('chats').doc(chatRoomId);
 
-    await chatRoomRef.set({
-      'deleted_up_to': {
-        currentUserId: FieldValue.serverTimestamp(),
-      },
-    }, SetOptions(merge: true));
+    // En lugar de borrar, marcamos el chat como oculto para el usuario actual.
+    // Esto es más seguro y reversible.
+    await chatRoomRef.update({
+      'hidden_for': FieldValue.arrayUnion([currentUserId])
+    });
   }
 
   Stream<DocumentSnapshot> getChatRoomStream(String chatRoomId) {
@@ -113,12 +112,15 @@ class ChatService {
     return query.snapshots();
   }
 
+  // --- MÉTODO CORREGIDO ---
   Stream<QuerySnapshot> getChatListStream() {
     final currentUserId = _auth.currentUser?.uid;
     if (currentUserId == null) return const Stream.empty();
 
+    // La consulta ahora es disciplinada. Obedece la ley de las reglas de seguridad.
     return _firestore
         .collection('chats')
+        .where('participants', arrayContains: currentUserId)
         .orderBy('lastMessageTimestamp', descending: true)
         .snapshots();
   }
