@@ -10,12 +10,14 @@ import 'package:roozterfaceapp/services/fight_service.dart';
 class AddFightScreen extends StatefulWidget {
   final String galleraId;
   final String roosterId;
+  final String roosterName; // <-- ¡NUEVO PARÁMETRO!
   final FightModel? fightToEdit;
 
   const AddFightScreen({
     super.key,
     required this.galleraId,
     required this.roosterId,
+    required this.roosterName, // <-- ¡NUEVO PARÁMETRO!
     this.fightToEdit,
   });
 
@@ -81,10 +83,11 @@ class _AddFightScreenState extends State<AddFightScreen> {
       firstDate: DateTime(2000),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (picked != null)
+    if (picked != null) {
       setState(() {
         _selectedDate = picked;
       });
+    }
   }
 
   Future<void> _saveFight() async {
@@ -108,11 +111,12 @@ class _AddFightScreenState extends State<AddFightScreen> {
       if (_isEditing) {
         final netProfit = _netProfitController.text.trim().isEmpty
             ? null
-            : double.tryParse(_netProfitController.text);
+            : double.tryParse(_netProfitController.text.replaceAll(',', ''));
 
         await _fightService.updateFight(
           galleraId: widget.galleraId,
           roosterId: widget.roosterId,
+          roosterName: widget.roosterName, // <-- PARÁMETRO AÑADIDO
           fightId: widget.fightToEdit!.id,
           date: _selectedDate!,
           location: _locationController.text.trim(),
@@ -142,9 +146,10 @@ class _AddFightScreenState extends State<AddFightScreen> {
         if (_isEditing) Navigator.of(context).pop();
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error al guardar: ${e.toString()}')));
+      }
     } finally {
       if (mounted) {
         setState(() {

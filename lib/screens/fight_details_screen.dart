@@ -9,16 +9,17 @@ import 'package:roozterfaceapp/services/fight_service.dart';
 class FightDetailsScreen extends StatelessWidget {
   final String galleraId;
   final String roosterId;
+  final String roosterName; // <-- NUEVO PARÁMETRO
   final FightModel fight;
 
   const FightDetailsScreen({
     super.key,
     required this.galleraId,
     required this.roosterId,
+    required this.roosterName, // <-- NUEVO PARÁMETRO
     required this.fight,
   });
 
-  // Navega al formulario en modo edición
   void _goToEditScreen(BuildContext context) {
     Navigator.push(
       context,
@@ -26,13 +27,13 @@ class FightDetailsScreen extends StatelessWidget {
         builder: (context) => AddFightScreen(
           galleraId: galleraId,
           roosterId: roosterId,
+          roosterName: roosterName, // <-- PARÁMETRO PASADO
           fightToEdit: fight,
         ),
       ),
     );
   }
 
-  // Lógica para borrar el evento
   void _deleteFight(BuildContext context) async {
     bool? confirm = await showDialog<bool>(
       context: context,
@@ -63,7 +64,7 @@ class FightDetailsScreen extends StatelessWidget {
           roosterId: roosterId,
           fightId: fight.id,
         );
-        Navigator.of(context).pop(); // Cierra esta pantalla de detalles
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Evento de combate borrado.')),
         );
@@ -75,7 +76,6 @@ class FightDetailsScreen extends StatelessWidget {
     }
   }
 
-  // Widget de ayuda para las filas de detalles
   Widget _buildDetailRow(String label, String value, {Color? valueColor}) {
     if (value.isEmpty) return const SizedBox.shrink();
     return Padding(
@@ -97,14 +97,12 @@ class FightDetailsScreen extends StatelessWidget {
     );
   }
 
-  // Widget de ayuda para crear las tarjetas de sección
   Widget _buildInfoCard({
     required BuildContext context,
     required String title,
     required IconData icon,
     required List<Widget> children,
   }) {
-    // Si no hay hijos (filas de detalle), no muestra la tarjeta
     if (children.every(
       (widget) => widget is SizedBox && widget.height == 0.0,
     )) {
@@ -186,8 +184,8 @@ class FightDetailsScreen extends StatelessWidget {
                     valueColor: fight.result == 'Victoria'
                         ? Colors.green.shade700
                         : (fight.result == 'Derrota'
-                              ? Colors.red.shade700
-                              : null),
+                            ? Colors.red.shade700
+                            : null),
                   ),
                   _buildDetailRow(
                     'Arma Utilizada',
@@ -221,6 +219,22 @@ class FightDetailsScreen extends StatelessWidget {
                   _buildDetailRow('Post-Combate', fight.postFightNotes ?? ''),
               ],
             ),
+            if (fight.netProfit != null)
+              _buildInfoCard(
+                context: context,
+                title: 'Resultado Financiero',
+                icon: Icons.monetization_on_outlined,
+                children: [
+                  _buildDetailRow(
+                    'Balance Neto',
+                    NumberFormat.currency(locale: 'es_MX', symbol: '\$')
+                        .format(fight.netProfit),
+                    valueColor: fight.netProfit! >= 0
+                        ? Colors.green.shade700
+                        : Colors.red.shade700,
+                  ),
+                ],
+              ),
           ],
         ),
       ),

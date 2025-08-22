@@ -13,50 +13,47 @@ class RoosterListProvider with ChangeNotifier {
   bool _isLoading = true; // Inicia como 'true' por defecto
   String? _currentGalleraId;
 
-  // --- Getters públicos
   List<RoosterModel> get roosters => _roosters;
   bool get isLoading => _isLoading;
   String? get currentGalleraId => _currentGalleraId;
 
   void fetchRoosters(String? galleraId) {
-    // Si la gallera es la misma, no hacemos nada.
-    if (galleraId == _currentGalleraId) {
+    // Si la gallera que nos piden cargar ya es la que tenemos, no hacemos nada.
+    if (galleraId == _currentGalleraId && !_isLoading) {
       return;
     }
 
     _currentGalleraId = galleraId;
     _roosterSubscription?.cancel();
 
-    // Caso: No hay gallera activa.
+    // Si no hay galleraId, limpiamos el estado y notificamos.
     if (_currentGalleraId == null || _currentGalleraId!.isEmpty) {
       _roosters = [];
-      // Nos aseguramos de que el indicador de carga se quite.
-      if (_isLoading) {
-        _isLoading = false;
-        notifyListeners();
-      }
+      _isLoading = false;
+      notifyListeners();
       return;
     }
 
-    // --- PUNTO CRÍTICO DE LA CORRECCIÓN ---
-    // ANTES de suscribirnos al nuevo stream, ANUNCIAMOS que una nueva carga va a comenzar.
-    // Esto asegura que la HomeScreen muestre el indicador de carga ANTES de recibir la lista.
+    // --- ¡LÓGICA DE CARGA CORREGIDA Y DISCIPLINADA! ---
+    // 1. ANTES de hacer nada, anunciamos que estamos cargando.
     _isLoading = true;
     _roosters =
-        []; // Vaciamos la lista vieja para que no se muestren datos incorrectos mientras carga.
-    notifyListeners(); // FORZAMOS la reconstrucción de la UI al estado de carga.
+        []; // Vaciamos los datos antiguos para no mostrarlos incorrectamente.
+    notifyListeners(); // Forzamos a la UI a mostrar el indicador de carga.
 
+    // 2. AHORA, nos suscribimos al stream de datos.
     _roosterSubscription = _roosterService
         .getRoostersStream(_currentGalleraId!)
         .listen((roostersData) {
+      // 3. Cuando llegan los datos, actualizamos el estado y anunciamos que terminamos.
       _roosters = roostersData;
-      _isLoading =
-          false; // Al recibir datos (incluso una lista vacía), ANUNCIAMOS que la carga ha terminado.
-      notifyListeners(); // Notificamos a la UI para que se reconstruya con los nuevos datos Y SIN el indicador.
+      _isLoading = false;
+      notifyListeners();
     }, onError: (error) {
       print("Error en el stream de RoosterListProvider: $error");
+      // 4. Si hay un error, también terminamos la carga.
       _roosters = [];
-      _isLoading = false; // También terminamos la carga si hay un error.
+      _isLoading = false;
       notifyListeners();
     });
   }

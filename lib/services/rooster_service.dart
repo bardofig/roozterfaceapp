@@ -114,7 +114,6 @@ class RoosterService {
     String? areaName,
   }) async {
     if (currentUserId == null) throw Exception("Usuario no autenticado.");
-    // --- ¡RUTA DE ARCHIVO CORREGIDA Y DEFINITIVA! ---
     String filePath =
         'users/$currentUserId/gallos/${DateTime.now().millisecondsSinceEpoch}.jpg';
     Reference photoRef = _storage.ref().child(filePath);
@@ -196,7 +195,6 @@ class RoosterService {
     Reference? newPhotoRef;
     try {
       if (newImageFile != null) {
-        // --- ¡NUEVA RUTA! ---
         String filePath =
             'users/$currentUserId/gallos/${DateTime.now().millisecondsSinceEpoch}.jpg';
         newPhotoRef = _storage.ref().child(filePath);
@@ -252,6 +250,34 @@ class RoosterService {
       throw Exception(
           "Ocurrió un error al actualizar los datos: ${e.toString()}");
     }
+  }
+
+  /// --- ¡NUEVA FUNCIÓN! ---
+  /// Registra la venta de un gallo, actualizando su estado y detalles de venta.
+  /// Esto disparará la Cloud Function 'onRoosterUpdate' para crear la transacción.
+  Future<void> recordSale({
+    required String galleraId,
+    required String roosterId,
+    required double salePrice,
+    required DateTime saleDate,
+    required String buyerName,
+    String? saleNotes,
+  }) async {
+    if (salePrice <= 0) {
+      throw Exception("El precio de venta debe ser un número positivo.");
+    }
+
+    final Map<String, dynamic> saleData = {
+      'status': 'Vendido',
+      'salePrice': salePrice,
+      'saleDate': Timestamp.fromDate(saleDate),
+      'buyerName': buyerName,
+      'saleNotes': saleNotes ?? '',
+      'showInShowcase': false, // Un gallo vendido ya no está en el escaparate
+      'lastUpdate': FieldValue.serverTimestamp(),
+    };
+
+    await _roostersCollection(galleraId).doc(roosterId).update(saleData);
   }
 
   Future<void> deleteRooster({

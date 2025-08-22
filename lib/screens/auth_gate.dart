@@ -3,6 +3,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:roozterfaceapp/screens/complete_profile_screen.dart'; // <-- ¡NUEVA IMPORTACIÓN!
 import 'package:roozterfaceapp/screens/login_or_register_screen.dart';
 import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/screens/home_screen.dart';
@@ -15,39 +16,40 @@ class AuthGate extends StatelessWidget {
     return StreamBuilder<User?>(
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, authSnapshot) {
-        // Muestra un indicador de carga mientras se determina el estado de autenticación inicial.
         if (authSnapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // --- PRIMER PUESTO DE CONTROL: ¿Está el usuario autenticado en Firebase? ---
+        // PUESTO DE CONTROL 1: ¿Usuario autenticado en Firebase?
         if (authSnapshot.hasData) {
-          // Si está autenticado, escuchamos al UserDataProvider para el segundo puesto de control.
           return Consumer<UserDataProvider>(
             builder: (context, userProvider, child) {
-              // --- SEGUNDO PUESTO DE CONTROL: ¿Está el perfil de Firestore cargado? ---
+              // PUESTO DE CONTROL 2: ¿Perfil de Firestore cargado?
               if (userProvider.isLoading || userProvider.userProfile == null) {
-                // Si el perfil se está cargando O AÚN no se ha cargado (caso de login rápido),
-                // mostramos una pantalla de carga. Esto previene la condición de carrera.
                 return const Scaffold(
-                  body: Center(
-                    child: CircularProgressIndicator(),
-                  ),
+                  body: Center(child: CircularProgressIndicator()),
                 );
-              } else {
-                // ¡ÉXITO TOTAL! Tenemos autenticación y perfil. Mostramos HomeScreen.
-                // HomeScreen tiene su propio Scaffold, por lo que lo devolvemos directamente.
+              }
+
+              // --- ¡NUEVO PUESTO DE CONTROL 3! ---
+              // ¿El perfil del usuario está completo?
+              // Usamos `fullName` como indicador clave. Si está vacío, el perfil no se ha completado.
+              final isProfileComplete =
+                  userProvider.userProfile!.fullName.trim().isNotEmpty;
+
+              if (isProfileComplete) {
+                // Si el perfil está completo, va a la pantalla principal.
                 return const HomeScreen();
+              } else {
+                // Si el perfil NO está completo, se le dirige a la pantalla para completarlo.
+                return const CompleteProfileScreen();
               }
             },
           );
         } else {
-          // No hay usuario autenticado. Mostramos el flujo de Login/Registro.
-          // LoginOrRegister también tendrá su propio Scaffold.
+          // No hay usuario autenticado.
           return const LoginOrRegisterScreen();
         }
       },

@@ -55,9 +55,6 @@ class _HomeScreenState extends State<HomeScreen>
     super.dispose();
   }
 
-  // --- El resto de los métodos de ayuda permanecen idénticos ---
-  // (signOut, addRooster, goToRoosterDetails, _showLimitDialog, etc.)
-
   void signOut() {
     _authService.signOut();
   }
@@ -160,17 +157,6 @@ class _HomeScreenState extends State<HomeScreen>
         final userProfile = userProvider.userProfile!;
         final activeGalleraId = userProfile.activeGalleraId;
 
-        if (activeGalleraId != roosterProvider.currentGalleraId) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              context
-                  .read<RoosterListProvider>()
-                  .fetchRoosters(activeGalleraId);
-            }
-          });
-        }
-
-        // Caso: El usuario no tiene gallera activa. Este sí necesita su propio Scaffold.
         if (activeGalleraId == null || activeGalleraId.isEmpty) {
           return Scaffold(
             appBar: AppBar(
@@ -185,15 +171,15 @@ class _HomeScreenState extends State<HomeScreen>
         final isPlanIniciacion = userProfile.plan == 'iniciacion';
         final canAddRooster = !isPlanIniciacion || allRoosters.length < 15;
 
-        // --- ARQUITECTURA DEL CAPARAZÓN ÚNICO ---
         return Scaffold(
           appBar: AppBar(
             title: const Text('Mis Ejemplares'),
             actions: [_buildInvitationsButton(), _buildChatButton()],
-            // El TabBar se construye aquí incondicionalmente, solo mostrará
-            // los números correctos cuando los datos estén listos.
             bottom: roosterProvider.isLoading
-                ? null
+                ? const PreferredSize(
+                    preferredSize: Size.fromHeight(4.0),
+                    child: LinearProgressIndicator(),
+                  )
                 : TabBar(
                     controller: _tabController,
                     tabs: [
@@ -210,10 +196,11 @@ class _HomeScreenState extends State<HomeScreen>
           drawer: _buildDrawer(context, userProfile),
           floatingActionButton: FloatingActionButton(
             onPressed: () {
-              if (canAddRooster)
+              if (canAddRooster) {
                 addRooster(context);
-              else
+              } else {
                 _showLimitDialog();
+              }
             },
             backgroundColor: canAddRooster
                 ? Theme.of(context).colorScheme.primary
@@ -221,7 +208,6 @@ class _HomeScreenState extends State<HomeScreen>
             child:
                 Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
           ),
-          // --- El CONTENIDO del body es lo ÚNICO que cambia ---
           body: roosterProvider.isLoading
               ? const Center(child: CircularProgressIndicator())
               : TabBarView(
@@ -248,8 +234,6 @@ class _HomeScreenState extends State<HomeScreen>
       },
     );
   }
-
-  // --- El resto de los métodos de construcción de la UI (_buildDrawer, etc.) permanecen idénticos ---
 
   Widget _buildInvitationsButton() {
     return StreamBuilder<DocumentSnapshot?>(

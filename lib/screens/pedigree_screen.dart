@@ -141,8 +141,7 @@ class _PedigreeScreenState extends State<PedigreeScreen> {
       int currentDepth = 0,
     }) async {
       if (currentDepth >= maxDepth ||
-          allAncestorIds.contains(currentRooster.id))
-        return;
+          allAncestorIds.contains(currentRooster.id)) return;
       allAncestorIds.add(currentRooster.id);
 
       if (currentRooster.fatherId != null) {
@@ -211,9 +210,10 @@ class _PedigreeScreenState extends State<PedigreeScreen> {
           _roosterDataMap.containsKey(currentRooster.motherId)) {
         final mother = _roosterDataMap[currentRooster.motherId]!;
         buildGraphFromData(mother, maxDepth, currentDepth: currentDepth + 1);
-        // --- CORRECCIÓN CRÍTICA DEL TYPO ---
+        // --- ¡CORRECCIÓN CRÍTICA APLICADA! ---
+        // La arista ahora se origina desde el nodo del gallo actual hacia la madre.
         graph.addEdge(
-          nodes[currentRooster.id]!, // La variable correcta
+          nodes[currentRooster.id]!, // <-- CAMBIO REALIZADO
           nodes[mother.id]!,
           paint: Paint()
             ..color = Colors.pink
@@ -222,7 +222,6 @@ class _PedigreeScreenState extends State<PedigreeScreen> {
       }
     }
 
-    // Aseguramos que el gallo inicial esté en el mapa antes de empezar a construir
     if (_roosterDataMap.containsKey(widget.initialRooster.id)) {
       buildGraphFromData(widget.initialRooster, 3);
     }

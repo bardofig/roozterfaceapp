@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:roozterfaceapp/models/user_model.dart';
 import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/services/gallera_service.dart';
+import 'package:roozterfaceapp/utils/error_handler.dart';
 
 class GalleraManagementScreen extends StatefulWidget {
   const GalleraManagementScreen({super.key});
@@ -21,25 +22,12 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
   UserModel? _currentUserProfile;
   bool _isSavingName = false;
 
-  Future<List<Map<String, dynamic>>>? _membersFuture;
-
   @override
   void initState() {
     super.initState();
     final userProvider = Provider.of<UserDataProvider>(context, listen: false);
     _currentUserProfile = userProvider.userProfile;
     _activeGalleraId = _currentUserProfile?.activeGalleraId;
-
-    if (_activeGalleraId != null) {
-      _loadMembers();
-    }
-  }
-
-  void _loadMembers() {
-    setState(() {
-      _membersFuture =
-          _galleraService.getMemberDetails(galleraId: _activeGalleraId!);
-    });
   }
 
   @override
@@ -52,9 +40,7 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
     if (_activeGalleraId == null || _galleraNameController.text.trim().isEmpty)
       return;
     FocusScope.of(context).unfocus();
-    setState(() {
-      _isSavingName = true;
-    });
+    setState(() => _isSavingName = true);
     try {
       await _galleraService.updateGalleraName(
         galleraId: _activeGalleraId!,
@@ -63,26 +49,21 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Nombre de la gallera actualizado.'),
-            backgroundColor: Colors.green,
-          ),
+              content: Text('Nombre de la gallera actualizado.'),
+              backgroundColor: Colors.green),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al guardar: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+              content: Text(
+                  'Error al guardar: ${ErrorHandler.getUserFriendlyMessage(e)}'),
+              backgroundColor: Colors.red),
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSavingName = false;
-        });
-      }
+      if (mounted) setState(() => _isSavingName = false);
     }
   }
 
@@ -163,18 +144,14 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
       );
       messenger.showSnackBar(
         const SnackBar(
-          content: Text("Invitación enviada con éxito."),
-          backgroundColor: Colors.green,
-        ),
+            content: Text("Invitación enviada con éxito."),
+            backgroundColor: Colors.green),
       );
-      // Tras una invitación exitosa, refrescamos la lista.
-      _loadMembers();
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Error: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+            content: Text('Error: ${ErrorHandler.getUserFriendlyMessage(e)}'),
+            backgroundColor: Colors.red),
       );
     }
   }
@@ -188,14 +165,12 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
             '¿Estás seguro de que quieres eliminar a "$memberName" de la gallera? Esta acción no se puede deshacer.'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar')),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Eliminar'),
-          ),
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Eliminar')),
         ],
       ),
     );
@@ -209,18 +184,15 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
         );
         messenger.showSnackBar(
           SnackBar(
-            content: Text('"$memberName" ha sido eliminado.'),
-            backgroundColor: Colors.green,
-          ),
+              content: Text('"$memberName" ha sido eliminado.'),
+              backgroundColor: Colors.green),
         );
-        // Tras eliminar, refrescamos la lista.
-        _loadMembers();
       } catch (e) {
         messenger.showSnackBar(
           SnackBar(
-            content: Text('Error al eliminar: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+              content: Text(
+                  'Error al eliminar: ${ErrorHandler.getUserFriendlyMessage(e)}'),
+              backgroundColor: Colors.red),
         );
       }
     }
@@ -272,9 +244,11 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
                   border: OutlineInputBorder(),
                   labelText: 'Cargando nombre...'));
         }
-        if (_galleraNameController.text != (snapshot.data?.get('name') ?? '')) {
-          _galleraNameController.text = snapshot.data?.get('name') ?? '';
+        final currentName = snapshot.data?.get('name') ?? '';
+        if (_galleraNameController.text != currentName) {
+          _galleraNameController.text = currentName;
         }
+
         return TextField(
           controller: _galleraNameController,
           onSubmitted: (_) => _saveGalleraName(),
@@ -298,8 +272,9 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
   }
 
   Widget _buildMembersList() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: _membersFuture,
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream:
+          _galleraService.getMemberDetailsStream(galleraId: _activeGalleraId!),
       builder: (context, membersSnapshot) {
         if (membersSnapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());

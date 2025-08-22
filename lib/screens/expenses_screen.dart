@@ -34,7 +34,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
         TextEditingController(text: expenseToEdit?.description ?? '');
     final amountController = TextEditingController(
         text: expenseToEdit != null
-            ? expenseToEdit.amount.toStringAsFixed(2)
+            ? expenseToEdit.amount.toStringAsFixed(2).replaceAll('.00', '')
             : '');
     String selectedCategory = expenseToEdit?.category ?? 'Alimentación';
     DateTime selectedDate =
@@ -139,14 +139,24 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   onPressed: () async {
                     if (formKey.currentState!.validate()) {
                       try {
-                        // TODO: Implementar updateExpense en ExpenseService
-                        await _expenseService.addExpense(
-                          galleraId: activeGalleraId,
-                          date: selectedDate,
-                          category: selectedCategory,
-                          description: descController.text.trim(),
-                          amount: double.parse(amountController.text),
-                        );
+                        if (isEditing) {
+                          await _expenseService.updateExpense(
+                            galleraId: activeGalleraId,
+                            expenseId: expenseToEdit!.id,
+                            date: selectedDate,
+                            category: selectedCategory,
+                            description: descController.text.trim(),
+                            amount: double.parse(amountController.text),
+                          );
+                        } else {
+                          await _expenseService.addExpense(
+                            galleraId: activeGalleraId,
+                            date: selectedDate,
+                            category: selectedCategory,
+                            description: descController.text.trim(),
+                            amount: double.parse(amountController.text),
+                          );
+                        }
                         if (mounted) Navigator.of(context).pop();
                       } catch (e) {
                         if (mounted)
@@ -198,7 +208,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Registro de Gastos')),
       floatingActionButton: FloatingActionButton(
-          onPressed: _showExpenseDialog,
+          onPressed: () => _showExpenseDialog(),
           child: const Icon(Icons.add),
           tooltip: 'Registrar Gasto'),
       body: Column(
@@ -211,20 +221,16 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   startDate: _startDate,
                   endDate: _endDate),
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting)
+                if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
+                }
                 if (snapshot.hasError) {
-                  String errorMessage =
-                      'Error al cargar gastos: ${snapshot.error}';
-                  if (snapshot.error.toString().contains('requires an index')) {
-                    errorMessage =
-                        'La base de datos requiere un nuevo índice. Ejecuta la app en modo debug y sigue el enlace en la consola para crearlo.';
-                  }
                   return Center(
                       child: Padding(
                           padding: const EdgeInsets.all(16.0),
-                          child:
-                              Text(errorMessage, textAlign: TextAlign.center)));
+                          child: Text(
+                              'Error al cargar gastos: ${snapshot.error}',
+                              textAlign: TextAlign.center)));
                 }
 
                 final expenses = snapshot.data ?? [];
@@ -290,6 +296,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                 margin: const EdgeInsets.symmetric(
                                     horizontal: 12, vertical: 6),
                                 child: ListTile(
+                                  onTap: () => _showExpenseDialog(
+                                      expenseToEdit: expense),
                                   leading: CircleAvatar(
                                       child: Icon(_getIconForCategory(
                                           expense.category))),
@@ -366,7 +374,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
     );
   }
 
-  Widget _buildSummaryCard(double totalAmount) {
+  Widget _buildSummaryCard(double totalExpenses) {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
@@ -394,7 +402,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           const SizedBox(height: 8),
           Text(
             NumberFormat.currency(locale: 'es_MX', symbol: '\$')
-                .format(totalAmount),
+                .format(totalExpenses),
             style: theme.textTheme.displaySmall?.copyWith(
                 color: Colors.redAccent, fontWeight: FontWeight.bold),
           ),

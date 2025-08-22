@@ -3,7 +3,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:roozterfaceapp/services/auth_service.dart';
-import 'package:roozterfaceapp/widgets/auth_text_field.dart'; // Usaremos un widget reutilizable
+import 'package:roozterfaceapp/utils/error_handler.dart'; // <-- ¡NUEVA IMPORTACIÓN!
+import 'package:roozterfaceapp/widgets/auth_text_field.dart';
 
 class LoginScreen extends StatefulWidget {
   final void Function()? onTap;
@@ -48,13 +49,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       await _authService.signInWithEmailAndPassword(
-        emailController.text,
+        emailController.text.trim(),
         passwordController.text,
       );
       if (mounted) Navigator.pop(context);
     } catch (e) {
-      Navigator.pop(context);
-      showErrorMessage(e.toString().replaceAll("Exception: ", ""));
+      if (mounted) Navigator.pop(context);
+      // --- ¡CAMBIO APLICADO! ---
+      final friendlyMessage = ErrorHandler.getUserFriendlyMessage(e);
+      showErrorMessage(friendlyMessage);
     }
   }
 
@@ -98,8 +101,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: true,
                   ),
                   const SizedBox(height: 25),
-
-                  // --- CORRECCIÓN: Usamos ElevatedButton ---
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton(
@@ -122,7 +123,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 50),
-
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

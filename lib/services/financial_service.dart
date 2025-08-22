@@ -21,72 +21,76 @@ class FinancialSummary {
 class FinancialService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  CollectionReference _roostersCollection(String galleraId) =>
-      _firestore.collection('galleras').doc(galleraId).collection('gallos');
-  CollectionReference _expensesCollection(String galleraId) =>
-      _firestore.collection('galleras').doc(galleraId).collection('expenses');
-
+  /// Obtiene el resumen financiero consultando la subcolección de transacciones de una gallera.
   Future<FinancialSummary> getFinancialSummary({
     required String galleraId,
     required DateTime startDate,
     required DateTime endDate,
   }) async {
+    if (galleraId.isEmpty) {
+      return FinancialSummary();
+    }
+
     final endOfDay =
         DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
 
-    // --- 1. Calcular Ingresos por Ventas (Esta consulta es correcta y permitida) ---
-    final salesQuery = await _roostersCollection(galleraId)
-        .where('status', isEqualTo: 'Vendido')
-        .where('saleDate', isGreaterThanOrEqualTo: startDate)
-        .where('saleDate', isLessThanOrEqualTo: endOfDay)
+    // --- RUTA MODIFICADA: Ahora apunta a la subcolección ---
+    final transactionsRef = _firestore
+        .collection('galleras')
+        .doc(galleraId)
+        .collection('transactions');
+
+    // --- CONSULTA 1: INGRESOS ---
+    final incomeQuery = await transactionsRef
+        // El filtro 'galleraId' ya no es necesario aquí
+        .where('type', isEqualTo: 'ingreso')
+        .where('date', isGreaterThanOrEqualTo: startDate)
+        .where('date', isLessThanOrEqualTo: endOfDay)
         .get();
 
-    final double totalSales = salesQuery.docs.fold(0.0, (sum, doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      return sum + ((data['salePrice'] as num?)?.toDouble() ?? 0.0);
-    });
-
-    // --- 2. Calcular Ganancias/Pérdidas por Combates (Lógica Segura, sin Collection Group) ---
+    double totalSales = 0.0;
     double totalFightProfit = 0.0;
-    final allRoostersSnapshot = await _roostersCollection(galleraId).get();
 
-    for (final roosterDoc in allRoostersSnapshot.docs) {
-      // Para cada gallo, consultamos su subcolección de peleas. Esto está permitido por tus reglas.
-      final fightsQuery = await roosterDoc.reference
-          .collection('fights')
-          .where('status', isEqualTo: 'Completado')
-          .where('date', isGreaterThanOrEqualTo: startDate)
-          .where('date', isLessThanOrEqualTo: endOfDay)
-          .get();
-
-      if (fightsQuery.docs.isNotEmpty) {
-        // Sumamos el resultado de las peleas de este gallo al total.
-        final profitForThisRooster = fightsQuery.docs.fold(0.0, (sum, doc) {
-          final data = doc.data(); // El cast no es necesario aquí.
-          return sum + ((data['netProfit'] as num?)?.toDouble() ?? 0.0);
-        });
-        totalFightProfit += profitForThisRooster;
+    for (var doc in incomeQuery.docs) {
+      final data = doc.data(); // No es necesario el cast a Map
+      final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+      if (data['category'] == 'venta') {
+        totalSales += amount;
+      } else if (data['category'] == 'combate') {
+        // En ingresos, el 'amount' de un combate es siempre positivo
+        totalFightProfit += amount;
       }
     }
 
-    // --- 3. Calcular Gastos Totales (Esta consulta es correcta y permitida) ---
-    final expensesQuery = await _expensesCollection(galleraId)
-        .where('expenseDate', isGreaterThanOrEqualTo: startDate)
-        .where('expenseDate', isLessThanOrEqualTo: endOfDay)
+    // --- CONSULTA 2: GASTOS ---
+    final expensesQuery = await transactionsRef
+        .where('type', isEqualTo: 'gasto')
+        .where('date', isGreaterThanOrEqualTo: startDate)
+        .where('date', isLessThanOrEqualTo: endOfDay)
         .get();
 
-    final double totalExpenses = expensesQuery.docs.fold(0.0, (sum, doc) {
-      final data = doc.data() as Map<String, dynamic>;
-      return sum + ((data['amount'] as num?)?.toDouble() ?? 0.0);
-    });
+    double totalExpensesFromGeneral = 0.0;
 
-    // --- 4. Calcular los Totales Finales ---
-    final double totalIncome = totalSales + totalFightProfit;
+    for (var doc in expensesQuery.docs) {
+      final data = doc.data();
+      final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+      // Sumamos todos los gastos, incluyendo los de combate (que ya son positivos)
+      totalExpensesFromGeneral += amount;
+      // Si queremos desglosar el profit/loss de combates, lo restamos del ingreso
+      if (data['category'] == 'combate') {
+        totalFightProfit -= amount;
+      }
+    }
+
+    // --- CÁLCULOS FINALES ---
+    final double totalIncome =
+        totalSales + (totalFightProfit > 0 ? totalFightProfit : 0);
+    final double totalExpenses = totalExpensesFromGeneral;
     final double netBalance = totalIncome - totalExpenses;
 
     return FinancialSummary(
       totalSales: totalSales,
-      totalFightProfit: totalFightProfit,
+      totalFightProfit: totalFightProfit, // Esto puede ser negativo ahora
       totalIncome: totalIncome,
       totalExpenses: totalExpenses,
       netBalance: netBalance,
