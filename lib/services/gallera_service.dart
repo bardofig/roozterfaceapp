@@ -84,7 +84,7 @@ class GalleraService {
       } catch (e) {
         // Si la función falla, propagamos el error al StreamBuilder.
         print("Error al llamar a getMemberDetails desde el stream: $e");
-        throw e;
+        rethrow;
       }
     });
   }

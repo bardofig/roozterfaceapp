@@ -208,7 +208,7 @@ class _AddFightScreenState extends State<AddFightScreen> {
                       textCapitalization: TextCapitalization.words),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      value: _selectedResult,
+                      initialValue: _selectedResult,
                       decoration:
                           const InputDecoration(labelText: 'Resultado *'),
                       items: _results
@@ -222,7 +222,7 @@ class _AddFightScreenState extends State<AddFightScreen> {
                       }),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      value: _selectedWeaponType,
+                      initialValue: _selectedWeaponType,
                       isExpanded: true,
                       decoration:
                           const InputDecoration(labelText: 'Arma Utilizada'),
@@ -237,7 +237,7 @@ class _AddFightScreenState extends State<AddFightScreen> {
                       }),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      value: _selectedDuration,
+                      initialValue: _selectedDuration,
                       isExpanded: true,
                       decoration: const InputDecoration(
                           labelText: 'Duración de la Pelea'),
@@ -273,7 +273,7 @@ class _AddFightScreenState extends State<AddFightScreen> {
                           _survived = value;
                         });
                       },
-                      activeColor: Colors.green),
+                      activeThumbColor: Colors.green),
                   const Divider(height: 32),
                   Text("Resultado Financiero",
                       style: Theme.of(context).textTheme.titleLarge),

@@ -71,7 +71,7 @@ class HealthLogTile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     log.productName,
-                    style: TextStyle(fontWeight: FontWeight.w500),
+                    style: const TextStyle(fontWeight: FontWeight.w500),
                   ),
                   if (log.illnessOrCondition != null &&
                       log.illnessOrCondition!.isNotEmpty)

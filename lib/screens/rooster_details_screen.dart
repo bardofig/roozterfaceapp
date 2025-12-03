@@ -14,7 +14,6 @@ import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/screens/add_fight_screen.dart';
 import 'package:roozterfaceapp/screens/add_health_log_screen.dart';
 import 'package:roozterfaceapp/screens/add_rooster_screen.dart';
-import 'package:roozterfaceapp/screens/breeding_details_screen.dart';
 import 'package:roozterfaceapp/screens/fight_details_screen.dart';
 import 'package:roozterfaceapp/screens/health_log_details_screen.dart';
 import 'package:roozterfaceapp/screens/pedigree_screen.dart';
@@ -146,11 +145,13 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         validator: (v) {
-                          if (v == null || v.isEmpty)
+                          if (v == null || v.isEmpty) {
                             return 'El precio es obligatorio';
+                          }
                           if (double.tryParse(v) == null ||
-                              double.parse(v) <= 0)
+                              double.parse(v) <= 0) {
                             return 'Ingrese un precio válido';
+                          }
                           return null;
                         },
                       ),
@@ -577,11 +578,13 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     return FutureBuilder<HenProductionStats>(
       future: _henStatsFuture,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
-        if (snapshot.hasError)
+        }
+        if (snapshot.hasError) {
           return Center(
               child: Text("Error al cargar estadísticas: ${snapshot.error}"));
+        }
         final stats = snapshot.data ?? HenProductionStats();
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -637,14 +640,17 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
       stream: _breedingService.getBreedingHistoryStream(
           galleraId: activeGalleraId, roosterId: rooster.id),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
-        if (snapshot.hasError)
+        }
+        if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
+        }
         final events = snapshot.data ?? [];
-        if (events.isEmpty)
+        if (events.isEmpty) {
           return const Center(
               child: Text('No ha participado en ninguna cruza registrada.'));
+        }
         return ListView.builder(
           padding: const EdgeInsets.all(8),
           itemCount: events.length,
@@ -678,13 +684,15 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
           child: StreamBuilder<List<FightModel>>(
             stream: _fightService.getFightsStream(activeGalleraId, rooster.id),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
-              if (!snapshot.hasData || snapshot.data!.isEmpty)
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Center(
                     child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 24.0),
                         child: Text("No hay eventos registrados.")));
+              }
               final fights = snapshot.data!;
               return ListView.builder(
                 padding: const EdgeInsets.all(8),
@@ -722,13 +730,15 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
             stream:
                 _healthService.getHealthLogsStream(activeGalleraId, rooster.id),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting)
+              if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
-              if (!snapshot.hasData || snapshot.data!.isEmpty)
+              }
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return const Center(
                     child: Padding(
                         padding: EdgeInsets.symmetric(vertical: 24.0),
                         child: Text("No hay registros de salud.")));
+              }
               final logs = snapshot.data!;
               return ListView.builder(
                 padding: const EdgeInsets.all(8),
@@ -753,17 +763,20 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     return StreamBuilder<List<FightModel>>(
       stream: _fightService.getFightsStream(activeGalleraId, rooster.id),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting)
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
-        if (!snapshot.hasData || snapshot.data!.isEmpty)
+        }
+        if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(
               child: Text("No hay datos para generar analíticas."));
+        }
 
         final analytics =
             _analyticsService.calculateFightAnalytics(snapshot.data!);
-        if (analytics.totalFights == 0)
+        if (analytics.totalFights == 0) {
           return const Center(
               child: Text("No hay combates completados para analizar."));
+        }
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),

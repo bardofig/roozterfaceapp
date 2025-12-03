@@ -147,12 +147,14 @@ class BreedingService {
   }) async {
     final Map<String, dynamic> dataToUpdate = {};
     if (eggCount != null) dataToUpdate['eggCount'] = eggCount;
-    if (incubationStartDate != null)
+    if (incubationStartDate != null) {
       dataToUpdate['incubationStartDate'] =
           Timestamp.fromDate(incubationStartDate);
+    }
     if (chicksHatched != null) dataToUpdate['chicksHatched'] = chicksHatched;
-    if (hatchDate != null)
+    if (hatchDate != null) {
       dataToUpdate['hatchDate'] = Timestamp.fromDate(hatchDate);
+    }
     if (clutchNotes != null) dataToUpdate['clutchNotes'] = clutchNotes;
     if (dataToUpdate.isNotEmpty) {
       await _breedingEventsCollection(galleraId)

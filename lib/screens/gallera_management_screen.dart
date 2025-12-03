@@ -37,8 +37,10 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
   }
 
   Future<void> _saveGalleraName() async {
-    if (_activeGalleraId == null || _galleraNameController.text.trim().isEmpty)
+    if (_activeGalleraId == null ||
+        _galleraNameController.text.trim().isEmpty) {
       return;
+    }
     FocusScope.of(context).unfocus();
     setState(() => _isSavingName = true);
     try {
@@ -91,7 +93,7 @@ class _GalleraManagementScreenState extends State<GalleraManagementScreen> {
                   ),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                    value: selectedRole,
+                    initialValue: selectedRole,
                     decoration: const InputDecoration(labelText: 'Asignar Rol'),
                     items: roles
                         .map((role) => DropdownMenuItem(

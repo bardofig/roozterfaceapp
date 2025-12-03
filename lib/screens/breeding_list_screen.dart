@@ -45,8 +45,8 @@ class _BreedingListScreenState extends State<BreedingListScreen> {
             ),
           );
         },
-        child: const Icon(Icons.add),
         tooltip: 'Registrar Nueva Cruza',
+        child: const Icon(Icons.add),
       ),
       body: StreamBuilder<List<BreedingEventModel>>(
         stream: _breedingService.getAllBreedingEventsStream(

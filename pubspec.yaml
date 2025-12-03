@@ -2,7 +2,7 @@ name: roozterfaceapp
 description: "A new Flutter project."
 publish_to: 'none' 
 
-version: 1.0.0+2
+version: 1.0.0+3
 
 environment:
   sdk: '>=3.2.0 <4.0.0' # Actualizado a un rango moderno
@@ -31,6 +31,12 @@ dependencies:
   fl_chart: ^0.67.0
   cupertino_icons: ^1.0.6
   timeago: ^3.7.1
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.6
+  pdf: ^3.11.3
+  path_provider: ^2.1.5
+ # open_file_plus: ^3.4.1+1
+  open_filex: ^4.7.0
 
 dev_dependencies:
   flutter_test:
@@ -41,3 +47,41 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/
+    - assets/fonts/ # <-- AÑADE ESTA LÍNEA SI NO EXISTE
+
+  fonts:
+    - family: NotoEmoji
+      fonts:
+        - asset: assets/fonts/NotoEmoji-Regular.ttf
+
+# --- ¡NUEVA SECCIÓN AÑADIDA! ---
+# Asegúrate de añadir este bloque al final del archivo.
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/Icono-Roozterface.png" # <-- ¡CONFIRMA QUE ESTA RUTA ES CORRECTA!
+  min_sdk_android: 21
+
+flutter_native_splash:
+  # El color de fondo que quieres para la pantalla de inicio nativa.
+  # Debe coincidir con el fondo de tu SplashScreen de Flutter.
+  color: "#000000" # Negro
+
+  # La imagen que se mostrará en el centro.
+  # Usa una versión de tu logo sin fondo (PNG transparente) para mejores resultados.
+  # Asegúrate de que esta ruta sea correcta.
+  image: assets/images/Icono-Roozterface.png
+
+  # Configuración específica para Android 12+
+  android_12:
+    # El color de fondo para la pantalla de inicio de Android 12+.
+    color: "#000000" # Negro
+
+    # La imagen para Android 12+. Puede ser la misma.
+    image: assets/images/Icono-Roozterface.png
+    # El color del ícono si no se proporciona una imagen.
+    # No aplica en nuestro caso, pero es bueno tenerlo.
+    icon_background_color: "#000000"
+
+  # Configuración para la web (puedes omitirla si no la necesitas)
+  web: false

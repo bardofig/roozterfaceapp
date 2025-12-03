@@ -5,9 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
-import 'package:roozterfaceapp/auth_orchestrator.dart';
 import 'package:roozterfaceapp/providers/rooster_list_provider.dart';
 import 'package:roozterfaceapp/providers/user_data_provider.dart';
+import 'package:roozterfaceapp/screens/splash_screen.dart';
 import 'package:roozterfaceapp/services/payment_service.dart';
 import 'package:roozterfaceapp/theme/theme_provider.dart';
 import 'firebase_options.dart';
@@ -22,9 +22,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        // UserDataProvider es el proveedor raíz de la identidad del usuario.
         ChangeNotifierProvider(create: (_) => UserDataProvider()),
-        // RoosterListProvider se crea de forma independiente. El AuthOrchestrator se encargará de darle órdenes.
         ChangeNotifierProvider(create: (_) => RoosterListProvider()),
       ],
       child: const MyApp(),
@@ -51,10 +49,8 @@ class MyApp extends StatelessWidget {
         Locale('en', ''),
       ],
       locale: const Locale('es'),
-      // El punto de entrada a la UI de la app ahora es el AuthOrchestrator.
-      // Su trabajo es escuchar el estado y dirigir a los otros providers ANTES
-      // de que se muestre cualquier pantalla principal.
-      home: const AuthOrchestrator(),
+      // La pantalla de inicio de la aplicación ahora es SplashScreen.
+      home: const SplashScreen(),
     );
   }
 }

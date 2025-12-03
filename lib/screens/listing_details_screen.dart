@@ -104,18 +104,21 @@ class ListingDetailsScreen extends StatelessWidget {
             SizedBox(
               height: 300,
               width: double.infinity,
-              child: imageUrl.isNotEmpty
-                  ? CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      fit: BoxFit.cover,
-                      placeholder: (c, u) => Container(color: Colors.grey[300]),
-                      errorWidget: (c, u, e) => const Icon(Icons.broken_image),
-                    )
-                  : Container(
-                      color: Colors.grey[300],
-                      child: const Center(
-                          child: Icon(Icons.shield_outlined,
-                              size: 150, color: Colors.grey))),
+              child: Hero(
+                tag: 'listing_$roosterId',
+                child: imageUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (c, u) => Container(color: Colors.grey[300]),
+                        errorWidget: (c, u, e) => const Icon(Icons.broken_image),
+                      )
+                    : Container(
+                        color: Colors.grey[300],
+                        child: const Center(
+                            child: Icon(Icons.shield_outlined,
+                                size: 150, color: Colors.grey))),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -172,7 +175,8 @@ class ListingDetailsScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
               child: Card(
                 elevation: 0,
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
+                color:
+                    theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
                 child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(

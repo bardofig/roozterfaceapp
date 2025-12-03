@@ -134,11 +134,13 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
       body: FutureBuilder<List<RoosterModel>>(
         future: _breedersFuture,
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError)
+          }
+          if (snapshot.hasError) {
             return Center(
                 child: Text('Error al cargar ejemplares: ${snapshot.error}'));
+          }
 
           final sires = snapshot.data!.where((r) => r.sex == 'macho').toList();
           final dams = snapshot.data!.where((r) => r.sex == 'hembra').toList();
@@ -168,7 +170,7 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
                       textCapitalization: TextCapitalization.words)
                 else
                   DropdownButtonFormField<RoosterModel>(
-                    value: _selectedFather,
+                    initialValue: _selectedFather,
                     decoration: const InputDecoration(
                         labelText: 'Seleccionar Semental Registrado'),
                     isExpanded: true,
@@ -203,7 +205,7 @@ class _AddBreedingEventScreenState extends State<AddBreedingEventScreen> {
                       textCapitalization: TextCapitalization.words)
                 else
                   DropdownButtonFormField<RoosterModel>(
-                    value: _selectedMother,
+                    initialValue: _selectedMother,
                     decoration: const InputDecoration(
                         labelText: 'Seleccionar Gallina Registrada'),
                     isExpanded: true,

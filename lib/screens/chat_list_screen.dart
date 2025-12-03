@@ -63,8 +63,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
       appBar: AppBar(
         title: const Text('Mis Conversaciones'),
       ),
-      backgroundColor:
-          Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.2),
+      backgroundColor: Theme.of(context)
+          .colorScheme
+          .surfaceContainerHighest
+          .withOpacity(0.2),
       body: StreamBuilder<QuerySnapshot>(
         stream: _chatService.getChatListStream(),
         builder: (context, snapshot) {

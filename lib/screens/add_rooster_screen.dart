@@ -1,7 +1,6 @@
 // lib/screens/add_rooster_screen.dart
 
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -95,8 +94,9 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
   }
 
   void _loadRoosterData(RoosterModel rooster) {
-    if (rooster.status == 'Vendido' && !_statuses.contains('Vendido'))
+    if (rooster.status == 'Vendido' && !_statuses.contains('Vendido')) {
       _statuses.add('Vendido');
+    }
     _nameController.text = rooster.name;
     _plateController.text = rooster.plate;
     _selectedDate = rooster.birthDate.toDate();
@@ -236,9 +236,10 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
 
   Future<void> _saveRooster(List<RoosterModel> allRoosters) async {
     if (!_formKey.currentState!.validate() || _selectedDate == null) {
-      if (_selectedDate == null)
+      if (_selectedDate == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('La fecha de nacimiento es obligatoria.')));
+      }
       return;
     }
     if (widget.roosterToEdit == null && _selectedImage == null) {
@@ -252,15 +253,17 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
 
     RoosterModel? fatherData;
     try {
-      if (_selectedFatherId != null)
+      if (_selectedFatherId != null) {
         fatherData = allRoosters.firstWhere((r) => r.id == _selectedFatherId);
+      }
     } catch (e) {
       fatherData = null;
     }
     RoosterModel? motherData;
     try {
-      if (_selectedMotherId != null)
+      if (_selectedMotherId != null) {
         motherData = allRoosters.firstWhere((r) => r.id == _selectedMotherId);
+      }
     } catch (e) {
       motherData = null;
     }
@@ -344,14 +347,16 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
         if (widget.roosterToEdit != null) Navigator.of(context).pop();
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('Error al guardar: ${e.toString()}')));
+      }
     } finally {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _isSaving = false;
         });
+      }
     }
   }
 
@@ -372,11 +377,13 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
       body: FutureBuilder<List<dynamic>>(
         future: _initialDataFuture,
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError)
+          }
+          if (snapshot.hasError) {
             return Center(
                 child: Text("Error al cargar datos: ${snapshot.error}"));
+          }
 
           final allRoosters = snapshot.data![0] as List<RoosterModel>;
           final areas = snapshot.data![1] as List<AreaModel>;
@@ -476,8 +483,9 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                       selected: _selectedSex,
                       onSelectionChanged: (Set<Sex> newSelection) {
                         setState(() {
-                          if (newSelection.isNotEmpty)
+                          if (newSelection.isNotEmpty) {
                             _selectedSex = newSelection;
+                          }
                         });
                       },
                     ),
@@ -511,7 +519,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                   ]),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      value: _selectedStatus,
+                      initialValue: _selectedStatus,
                       decoration: const InputDecoration(labelText: 'Estado'),
                       items: _statuses
                           .map((s) => DropdownMenuItem<String>(
@@ -520,8 +528,9 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                       onChanged: (newValue) {
                         setState(() {
                           _selectedStatus = newValue;
-                          if (newValue == 'Vendido' && _saleDate == null)
+                          if (newValue == 'Vendido' && _saleDate == null) {
                             _saleDate = DateTime.now();
+                          }
                         });
                       }),
                   const SizedBox(height: 16),
@@ -533,7 +542,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                           const TextInputType.numberWithOptions(decimal: true)),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<AreaModel>(
-                      value: _selectedArea,
+                      initialValue: _selectedArea,
                       decoration: const InputDecoration(
                           labelText: 'Ubicación en la Gallera'),
                       isExpanded: true,
@@ -546,7 +555,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                       }),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      value: _selectedBreedLine,
+                      initialValue: _selectedBreedLine,
                       isExpanded: true,
                       decoration:
                           const InputDecoration(labelText: 'Línea / Casta'),
@@ -564,7 +573,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                     _buildBreedInfoCard(_selectedBreedProfile!),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      value: _selectedColor,
+                      initialValue: _selectedColor,
                       isExpanded: true,
                       decoration:
                           const InputDecoration(labelText: 'Color de Plumaje'),
@@ -579,7 +588,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                       }),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      value: _selectedCombType,
+                      initialValue: _selectedCombType,
                       isExpanded: true,
                       decoration:
                           const InputDecoration(labelText: 'Tipo de Cresta'),
@@ -594,7 +603,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                       }),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      value: _selectedLegColor,
+                      initialValue: _selectedLegColor,
                       isExpanded: true,
                       decoration:
                           const InputDecoration(labelText: 'Color de Patas'),
@@ -668,10 +677,11 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                               onChanged: (v) {
                                 setState(() {
                                   _isExternalFather = v;
-                                  if (v)
+                                  if (v) {
                                     _selectedFatherId = null;
-                                  else
+                                  } else {
                                     _fatherLineageController.clear();
+                                  }
                                 });
                               }),
                           if (_isExternalFather)
@@ -686,7 +696,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                                 textCapitalization: TextCapitalization.words)
                           else
                             DropdownButtonFormField<String>(
-                                value: validFatherId,
+                                initialValue: validFatherId,
                                 decoration: const InputDecoration(
                                     labelText: 'Padre Registrado'),
                                 items: sireDropdownItems,
@@ -701,10 +711,11 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                               onChanged: (v) {
                                 setState(() {
                                   _isExternalMother = v;
-                                  if (v)
+                                  if (v) {
                                     _selectedMotherId = null;
-                                  else
+                                  } else {
                                     _motherLineageController.clear();
+                                  }
                                 });
                               }),
                           if (_isExternalMother)
@@ -719,7 +730,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                                 textCapitalization: TextCapitalization.words)
                           else
                             DropdownButtonFormField<String>(
-                                value: validMotherId,
+                                initialValue: validMotherId,
                                 decoration: const InputDecoration(
                                     labelText: 'Madre Registrada'),
                                 items: damDropdownItems,

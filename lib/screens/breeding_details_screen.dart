@@ -277,8 +277,9 @@ class _BreedingDetailsScreenState extends State<BreedingDetailsScreen> {
                               initialDate: incubationDate ?? DateTime.now(),
                               firstDate: DateTime(2000),
                               lastDate: DateTime.now());
-                          if (picked != null)
+                          if (picked != null) {
                             setDialogState(() => incubationDate = picked);
+                          }
                         }),
                     const SizedBox(height: 16),
                     Text(
@@ -291,8 +292,9 @@ class _BreedingDetailsScreenState extends State<BreedingDetailsScreen> {
                               initialDate: hatchDate ?? DateTime.now(),
                               firstDate: DateTime(2000),
                               lastDate: DateTime.now());
-                          if (picked != null)
+                          if (picked != null) {
                             setDialogState(() => hatchDate = picked);
+                          }
                         }),
                     const SizedBox(height: 16),
                     TextField(

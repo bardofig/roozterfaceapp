@@ -2,7 +2,6 @@
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:roozterfaceapp/data/options_data.dart';
 import 'package:roozterfaceapp/models/health_log_model.dart';
 import 'package:roozterfaceapp/services/health_service.dart';
 
@@ -203,7 +202,7 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             DropdownButtonFormField<String>(
-              value: _selectedLogCategory,
+              initialValue: _selectedLogCategory,
               decoration: const InputDecoration(
                 labelText: 'Categoría del Registro *',
               ),
@@ -255,7 +254,7 @@ class _AddHealthLogScreenState extends State<AddHealthLogScreen> {
               Column(
                 children: [
                   DropdownButtonFormField<String>(
-                    value: _selectedIllness,
+                    initialValue: _selectedIllness,
                     decoration: const InputDecoration(
                       labelText: 'Enfermedad o Condición *',
                     ),

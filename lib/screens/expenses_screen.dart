@@ -68,7 +68,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       DropdownButtonFormField<String>(
-                        value: selectedCategory,
+                        initialValue: selectedCategory,
                         decoration:
                             const InputDecoration(labelText: 'Categoría'),
                         items: expenseCategories
@@ -76,8 +76,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                 DropdownMenuItem(value: cat, child: Text(cat)))
                             .toList(),
                         onChanged: (value) {
-                          if (value != null)
+                          if (value != null) {
                             setDialogState(() => selectedCategory = value);
+                          }
                         },
                       ),
                       const SizedBox(height: 16),
@@ -98,11 +99,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         validator: (v) {
-                          if (v == null || v.trim().isEmpty)
+                          if (v == null || v.trim().isEmpty) {
                             return 'El monto es obligatorio';
+                          }
                           if (double.tryParse(v) == null ||
-                              double.parse(v) <= 0)
+                              double.parse(v) <= 0) {
                             return 'Introduce un monto válido';
+                          }
                           return null;
                         },
                       ),
@@ -142,7 +145,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         if (isEditing) {
                           await _expenseService.updateExpense(
                             galleraId: activeGalleraId,
-                            expenseId: expenseToEdit!.id,
+                            expenseId: expenseToEdit.id,
                             date: selectedDate,
                             category: selectedCategory,
                             description: descController.text.trim(),
@@ -159,10 +162,11 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                         }
                         if (mounted) Navigator.of(context).pop();
                       } catch (e) {
-                        if (mounted)
+                        if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                               content: Text('Error: ${e.toString()}'),
                               backgroundColor: Colors.red));
+                        }
                       }
                     }
                   },
@@ -209,8 +213,8 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
       appBar: AppBar(title: const Text('Registro de Gastos')),
       floatingActionButton: FloatingActionButton(
           onPressed: () => _showExpenseDialog(),
-          child: const Icon(Icons.add),
-          tooltip: 'Registrar Gasto'),
+          tooltip: 'Registrar Gasto',
+          child: const Icon(Icons.add)),
       body: Column(
         children: [
           _buildDateFilter(),
@@ -277,13 +281,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                                       Navigator.of(context)
                                                           .pop(false)),
                                               TextButton(
-                                                  child: const Text("Borrar"),
                                                   style: TextButton.styleFrom(
                                                       foregroundColor:
                                                           Colors.red),
                                                   onPressed: () =>
                                                       Navigator.of(context)
-                                                          .pop(true)),
+                                                          .pop(true),
+                                                  child: const Text("Borrar")),
                                             ]));
                                 return confirm ?? false;
                               },

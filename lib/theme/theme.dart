@@ -19,7 +19,7 @@ ThemeData lightTheme = ThemeData(
     // Colores para contenedores del chat
     secondaryContainer: const Color(0xFFE3F2FD),
     onSecondaryContainer: const Color(0xFF1565C0),
-    surfaceVariant: Colors.grey.shade300,
+    surfaceContainerHighest: Colors.grey.shade300,
   ),
   // --- SECCIÓN CORREGIDA Y DEFINITIVA ---
   tabBarTheme: const TabBarThemeData(
@@ -45,7 +45,7 @@ ThemeData darkTheme = ThemeData(
     // Colores para contenedores del chat
     secondaryContainer: const Color(0xFF263238),
     onSecondaryContainer: const Color(0xFFCFD8DC),
-    surfaceVariant: Colors.grey.shade800,
+    surfaceContainerHighest: Colors.grey.shade800,
   ),
   // --- SECCIÓN CORREGIDA Y DEFINITIVA ---
   tabBarTheme: const TabBarThemeData(

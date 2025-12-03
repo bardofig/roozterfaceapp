@@ -62,7 +62,7 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
                       ),
                       const SizedBox(height: 16),
                       DropdownButtonFormField<String>(
-                        value: selectedCategory,
+                        initialValue: selectedCategory,
                         decoration:
                             const InputDecoration(labelText: 'Categoría'),
                         items: _areaCategories
@@ -114,12 +114,13 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
                         }
                         if (mounted) Navigator.of(context).pop();
                       } catch (e) {
-                        if (mounted)
+                        if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                                 content: Text('Error: ${e.toString()}'),
                                 backgroundColor: Colors.red),
                           );
+                        }
                       }
                     }
                   },
@@ -149,16 +150,18 @@ class _AreaManagementScreenState extends State<AreaManagementScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAreaDialog,
-        child: const Icon(Icons.add),
         tooltip: 'Añadir Nueva Área',
+        child: const Icon(Icons.add),
       ),
       body: StreamBuilder<List<AreaModel>>(
         stream: _areaService.getAreasStream(activeGalleraId),
         builder: (context, snapshot) {
-          if (!snapshot.hasData)
+          if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
-          if (snapshot.hasError)
+          }
+          if (snapshot.hasError) {
             return Center(child: Text('Error: ${snapshot.error}'));
+          }
 
           final areas = snapshot.data!;
           if (areas.isEmpty) {

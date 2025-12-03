@@ -77,8 +77,9 @@ class GalleraSwitcherScreen extends StatelessWidget {
                           : () async {
                               try {
                                 await userService.setActiveGallera(gallera.id);
-                                if (context.mounted)
+                                if (context.mounted) {
                                   Navigator.of(context).pop();
+                                }
                               } catch (e) {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(

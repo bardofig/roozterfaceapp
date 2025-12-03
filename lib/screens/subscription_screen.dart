@@ -88,7 +88,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     // Obtenemos el plan actual del usuario desde el provider
     final currentUserPlan =
         Provider.of<UserDataProvider>(context).userProfile?.plan ??
-        'iniciacion';
+            'iniciacion';
 
     return Scaffold(
       appBar: AppBar(
@@ -112,8 +112,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
       body: ValueListenableBuilder<PurchaseProcessStatus>(
         valueListenable: _paymentService.purchaseStatusNotifier,
         builder: (context, status, child) {
-          final bool isPurchasing =
-              status == PurchaseProcessStatus.pending ||
+          final bool isPurchasing = status == PurchaseProcessStatus.pending ||
               status == PurchaseProcessStatus.verifying;
 
           return Stack(
@@ -121,16 +120,16 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
               _isLoadingProducts
                   ? const Center(child: CircularProgressIndicator())
                   : _products.isEmpty
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(16.0),
-                        child: Text(
-                          'No hay planes disponibles en este momento. Asegúrate de haber configurado los productos en la Google Play Console.',
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    )
-                  : _buildPlanList(currentUserPlan),
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Text(
+                              'No hay planes disponibles en este momento. Asegúrate de haber configurado los productos en la Google Play Console.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                      : _buildPlanList(currentUserPlan),
               if (isPurchasing)
                 Container(
                   color: Colors.black.withOpacity(0.7),
@@ -273,9 +272,8 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     final Color cardColor = isRecommended
         ? (isDark ? Colors.blue.shade900 : Colors.blue.shade800)
         : theme.cardColor;
-    final Color textColor = isRecommended
-        ? Colors.white
-        : theme.colorScheme.onSurface;
+    final Color textColor =
+        isRecommended ? Colors.white : theme.colorScheme.onSurface;
     final Color checkColor = isRecommended ? Colors.white : Colors.green;
     final Color buttonBgColor = isRecommended
         ? Colors.white
@@ -341,7 +339,7 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                         borderRadius: BorderRadius.circular(30),
                       ),
                     ),
-                    child: Text('Mejorar Plan'),
+                    child: const Text('Mejorar Plan'),
                   ),
           ],
         ),

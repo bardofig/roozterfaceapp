@@ -10,7 +10,7 @@ class RoosterListProvider with ChangeNotifier {
   StreamSubscription? _roosterSubscription;
 
   List<RoosterModel> _roosters = [];
-  bool _isLoading = true; // Inicia como 'true' por defecto
+  bool _isLoading = true;
   String? _currentGalleraId;
 
   List<RoosterModel> get roosters => _roosters;
@@ -18,7 +18,6 @@ class RoosterListProvider with ChangeNotifier {
   String? get currentGalleraId => _currentGalleraId;
 
   void fetchRoosters(String? galleraId) {
-    // Si la gallera que nos piden cargar ya es la que tenemos, no hacemos nada.
     if (galleraId == _currentGalleraId && !_isLoading) {
       return;
     }
@@ -26,35 +25,42 @@ class RoosterListProvider with ChangeNotifier {
     _currentGalleraId = galleraId;
     _roosterSubscription?.cancel();
 
-    // Si no hay galleraId, limpiamos el estado y notificamos.
     if (_currentGalleraId == null || _currentGalleraId!.isEmpty) {
       _roosters = [];
       _isLoading = false;
-      notifyListeners();
+      // Usamos microtask para asegurar que la notificación no interfiera
+      // con un ciclo de construcción en progreso.
+      Future.microtask(() {
+        notifyListeners();
+      });
       return;
     }
 
-    // --- ¡LÓGICA DE CARGA CORREGIDA Y DISCIPLINADA! ---
-    // 1. ANTES de hacer nada, anunciamos que estamos cargando.
-    _isLoading = true;
-    _roosters =
-        []; // Vaciamos los datos antiguos para no mostrarlos incorrectamente.
-    notifyListeners(); // Forzamos a la UI a mostrar el indicador de carga.
+    // --- LÓGICA DE CARGA REFINADA CON MICROTASKS ---
+    // 1. Agenda la notificación de 'cargando' para el próximo ciclo de eventos.
+    Future.microtask(() {
+      _isLoading = true;
+      _roosters = [];
+      notifyListeners();
+    });
 
-    // 2. AHORA, nos suscribimos al stream de datos.
     _roosterSubscription = _roosterService
         .getRoostersStream(_currentGalleraId!)
         .listen((roostersData) {
-      // 3. Cuando llegan los datos, actualizamos el estado y anunciamos que terminamos.
-      _roosters = roostersData;
-      _isLoading = false;
-      notifyListeners();
+      // 2. Cuando llegan los datos, agenda la notificación de 'terminado'.
+      Future.microtask(() {
+        _roosters = roostersData;
+        _isLoading = false;
+        notifyListeners();
+      });
     }, onError: (error) {
       print("Error en el stream de RoosterListProvider: $error");
-      // 4. Si hay un error, también terminamos la carga.
-      _roosters = [];
-      _isLoading = false;
-      notifyListeners();
+      // 3. Si hay un error, también agenda la notificación de 'terminado'.
+      Future.microtask(() {
+        _roosters = [];
+        _isLoading = false;
+        notifyListeners();
+      });
     });
   }
 

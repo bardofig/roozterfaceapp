@@ -263,7 +263,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Container(
                       width: 10,
                       height: 10,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                           color: Colors.red, shape: BoxShape.circle))),
           ]);
         });
@@ -318,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Container(
                       width: 10,
                       height: 10,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                           color: Colors.red, shape: BoxShape.circle))),
           ]);
         });
@@ -458,7 +458,7 @@ class _HomeScreenState extends State<HomeScreen>
               Positioned.fill(
                   child: Transform.flip(
                       flipX: true,
-                      child: Image.asset('assets/images/gallosinfondo.png',
+                      child: Image.asset('assets/images/Icono-Roozterface.png',
                           fit: BoxFit.cover,
                           color: Colors.black.withOpacity(0.5),
                           colorBlendMode: BlendMode.darken))),

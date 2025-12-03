@@ -25,6 +25,7 @@ class ListingTile extends StatelessWidget {
     final String ownerName = listingData['ownerName'] ?? 'Criador Desconocido';
     final String galleraName =
         listingData['galleraName'] ?? 'Gallera Desconocida';
+    final String roosterId = listingData['originalRoosterId'] ?? '';
     final double salePrice =
         (listingData['salePrice'] as num? ?? 0.0).toDouble();
 
@@ -44,22 +45,25 @@ class ListingTile extends StatelessWidget {
               SizedBox(
                 width: 100,
                 height: 100,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8.0),
-                  child: imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: imageUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) =>
-                              Container(color: Colors.grey.shade300),
-                          errorWidget: (context, url, error) =>
-                              const Icon(Icons.error),
-                        )
-                      : Container(
-                          color: Colors.grey.shade300,
-                          child: const Icon(Icons.shield_outlined,
-                              color: Colors.grey, size: 50),
-                        ),
+                child: Hero(
+                  tag: 'listing_$roosterId',
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8.0),
+                    child: imageUrl.isNotEmpty
+                        ? CachedNetworkImage(
+                            imageUrl: imageUrl,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) =>
+                                Container(color: Colors.grey.shade300),
+                            errorWidget: (context, url, error) =>
+                                const Icon(Icons.error),
+                          )
+                        : Container(
+                            color: Colors.grey.shade300,
+                            child: const Icon(Icons.shield_outlined,
+                                color: Colors.grey, size: 50),
+                          ),
+                  ),
                 ),
               ),
               const SizedBox(width: 16),

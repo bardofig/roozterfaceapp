@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <!-- Para Android 12+, esto establece el color de fondo de la ventana de inicio -->
+        <item name="android:windowSplashScreenBackground">@android:color/black</item>
+    </style>
+</resources>
