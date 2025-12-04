@@ -1,5 +1,6 @@
 // lib/providers/gallera_data_provider.dart
 
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:roozterfaceapp/providers/user_data_provider.dart';
@@ -9,6 +10,7 @@ class GalleraDataProvider with ChangeNotifier {
   final GalleraService _galleraService = GalleraService();
   DocumentSnapshot? _galleraData;
   bool _isLoading = true;
+  StreamSubscription<DocumentSnapshot>? _galleraSubscription; // ✅ Agregado
 
   DocumentSnapshot? get galleraData => _galleraData;
   bool get isLoading => _isLoading;
@@ -24,7 +26,8 @@ class GalleraDataProvider with ChangeNotifier {
   }
 
   void _listenToGalleraData(String galleraId) {
-    _galleraService
+    _galleraSubscription?.cancel(); // ✅ Cancelar suscripción anterior
+    _galleraSubscription = _galleraService
         .getGalleraStream(galleraId)
         .listen(
           (snapshot) {
@@ -43,5 +46,11 @@ class GalleraDataProvider with ChangeNotifier {
             notifyListeners();
           },
         );
+  }
+
+  @override
+  void dispose() {
+    _galleraSubscription?.cancel(); // ✅ Limpiar recursos
+    super.dispose();
   }
 }

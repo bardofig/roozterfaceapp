@@ -168,8 +168,8 @@ class _HomeScreenState extends State<HomeScreen>
         }
 
         final allRoosters = roosterProvider.roosters;
-        final isPlanIniciacion = userProfile.plan == 'iniciacion';
-        final canAddRooster = !isPlanIniciacion || allRoosters.length < 15;
+        // ✅ Bloqueo de suscripción removido - todos pueden agregar gallos ilimitados
+        final canAddRooster = true;
 
         return Scaffold(
           appBar: AppBar(
@@ -195,16 +195,8 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           drawer: _buildDrawer(context, userProfile),
           floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              if (canAddRooster) {
-                addRooster(context);
-              } else {
-                _showLimitDialog();
-              }
-            },
-            backgroundColor: canAddRooster
-                ? Theme.of(context).colorScheme.primary
-                : Colors.grey,
+            onPressed: () => addRooster(context), // ✅ Sin validación de límite
+            backgroundColor: Theme.of(context).colorScheme.primary,
             child:
                 Icon(Icons.add, color: Theme.of(context).colorScheme.onPrimary),
           ),
@@ -216,18 +208,27 @@ class _HomeScreenState extends State<HomeScreen>
                     RoosterListView(
                         roosters: allRoosters,
                         onDelete: (r) => _confirmDelete(context, r),
-                        onTap: (r) => goToRoosterDetails(context, r)),
+                        onTap: (r) => goToRoosterDetails(context, r),
+                        onLoadMore: roosterProvider.loadMore,
+                        isLoadingMore: roosterProvider.isLoadingMore,
+                    ),
                     RoosterListView(
                         roosters:
                             allRoosters.where((r) => r.sex == 'macho').toList(),
                         onDelete: (r) => _confirmDelete(context, r),
-                        onTap: (r) => goToRoosterDetails(context, r)),
+                        onTap: (r) => goToRoosterDetails(context, r),
+                        onLoadMore: roosterProvider.loadMore,
+                        isLoadingMore: roosterProvider.isLoadingMore,
+                    ),
                     RoosterListView(
                         roosters: allRoosters
                             .where((r) => r.sex == 'hembra')
                             .toList(),
                         onDelete: (r) => _confirmDelete(context, r),
-                        onTap: (r) => goToRoosterDetails(context, r)),
+                        onTap: (r) => goToRoosterDetails(context, r),
+                        onLoadMore: roosterProvider.loadMore,
+                        isLoadingMore: roosterProvider.isLoadingMore,
+                    ),
                   ],
                 ),
         );
@@ -350,9 +351,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _buildDrawer(BuildContext context, UserModel userProfile) {
-    final bool isMaestroOrHigher =
-        userProfile.plan == 'maestro' || userProfile.plan == 'elite';
-    final bool isEliteUser = userProfile.plan == 'elite';
+    // ✅ Bloqueos de suscripción removidos - todas las funcionalidades disponibles
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
@@ -363,50 +362,44 @@ class _HomeScreenState extends State<HomeScreen>
               icon: Icons.shopping_basket_outlined,
               title: 'Mercado de Ejemplares',
               onTap: () => _navigateTo(context, const MarketplaceScreen())),
-          if (isEliteUser)
-            _buildDrawerItem(context,
-                icon: Icons.storefront_outlined,
-                title: 'Mi Escaparate Público',
-                onTap: () =>
-                    _navigateTo(context, const PublicShowcaseScreen())),
+          _buildDrawerItem(context, // ✅ Disponible para todos
+              icon: Icons.storefront_outlined,
+              title: 'Mi Escaparate Público',
+              onTap: () =>
+                  _navigateTo(context, const PublicShowcaseScreen())),
           _buildDrawerSectionHeader(context, 'Mi Gallera'),
           _buildDrawerItem(context,
               icon: Icons.swap_horiz,
               title: 'Cambiar Gallera',
               onTap: () => _navigateTo(context, const GalleraSwitcherScreen())),
-          if (isEliteUser)
-            _buildDrawerItem(context,
-                icon: Icons.groups_outlined,
-                title: 'Gestionar Miembros',
-                onTap: () =>
-                    _navigateTo(context, const GalleraManagementScreen())),
-          if (isEliteUser)
-            _buildDrawerItem(context,
-                icon: Icons.map_outlined,
-                title: 'Gestionar Áreas',
-                onTap: () =>
-                    _navigateTo(context, const AreaManagementScreen())),
-          if (isMaestroOrHigher)
-            _buildDrawerItem(context,
-                icon: Icons.auto_stories,
-                title: 'Libro de Cría',
-                onTap: () => _navigateTo(context, const BreedingListScreen())),
-          if (isMaestroOrHigher) ...[
-            _buildDrawerSectionHeader(context, 'Registros y Finanzas'),
-            _buildDrawerItem(context,
-                icon: Icons.analytics_outlined,
-                title: 'Panel Financiero',
-                onTap: () =>
-                    _navigateTo(context, const FinancialDashboardScreen())),
-            _buildDrawerItem(context,
-                icon: Icons.monetization_on_outlined,
-                title: 'Registro de Ventas',
-                onTap: () => _navigateTo(context, const SalesHistoryScreen())),
-            _buildDrawerItem(context,
-                icon: Icons.request_quote_outlined,
-                title: 'Registro de Gastos',
-                onTap: () => _navigateTo(context, const ExpensesScreen())),
-          ],
+          _buildDrawerItem(context, // ✅ Disponible para todos
+              icon: Icons.groups_outlined,
+              title: 'Gestionar Miembros',
+              onTap: () =>
+                  _navigateTo(context, const GalleraManagementScreen())),
+          _buildDrawerItem(context, // ✅ Disponible para todos
+              icon: Icons.map_outlined,
+              title: 'Gestionar Áreas',
+              onTap: () =>
+                  _navigateTo(context, const AreaManagementScreen())),
+          _buildDrawerItem(context, // ✅ Disponible para todos
+              icon: Icons.auto_stories,
+              title: 'Libro de Cría',
+              onTap: () => _navigateTo(context, const BreedingListScreen())),
+          _buildDrawerSectionHeader(context, 'Registros y Finanzas'), // ✅ Disponible para todos
+          _buildDrawerItem(context,
+              icon: Icons.analytics_outlined,
+              title: 'Panel Financiero',
+              onTap: () =>
+                  _navigateTo(context, const FinancialDashboardScreen())),
+          _buildDrawerItem(context,
+              icon: Icons.monetization_on_outlined,
+              title: 'Registro de Ventas',
+              onTap: () => _navigateTo(context, const SalesHistoryScreen())),
+          _buildDrawerItem(context,
+              icon: Icons.request_quote_outlined,
+              title: 'Registro de Gastos',
+              onTap: () => _navigateTo(context, const ExpensesScreen())),
           _buildDrawerSectionHeader(context, 'Cuenta'),
           _buildDrawerItem(context,
               icon: Icons.account_circle_outlined,

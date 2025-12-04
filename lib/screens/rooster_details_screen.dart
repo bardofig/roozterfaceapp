@@ -1,6 +1,6 @@
 // lib/screens/rooster_details_screen.dart
 
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:roozterfaceapp/widgets/optimized_cached_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -82,19 +82,14 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
     final userProfile = userProvider.userProfile;
     if (userProfile == null) return;
 
-    final isMaestroOrHigher =
-        userProfile.plan == 'maestro' || userProfile.plan == 'elite';
-    final isEliteUser = userProfile.plan == 'elite';
+    // ✅ Bloqueos de suscripción removidos - tabs disponibles para todos
     final currentRoosterSex = forRooster.sex;
-
-    int tabCount = 1;
-    if (isMaestroOrHigher) {
-      if (currentRoosterSex == 'hembra') tabCount++;
-      tabCount++;
-      if (currentRoosterSex == 'macho') tabCount++;
-      tabCount++;
-      if (currentRoosterSex == 'macho' && isEliteUser) tabCount++;
-    }
+    int tabCount = 1; // General
+    if (currentRoosterSex == 'hembra') tabCount++; // Producción
+    tabCount++; // Cría
+    if (currentRoosterSex == 'macho') tabCount++; // Combates
+    tabCount++; // Salud
+    if (currentRoosterSex == 'macho') tabCount++; // Analítica
 
     if (_tabController?.length != tabCount) {
       final initialIndex = _tabController?.index ?? 0;
@@ -363,39 +358,36 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
               body: Center(child: CircularProgressIndicator()));
         }
 
-        final isMaestroOrHigher =
-            userProfile.plan == 'maestro' || userProfile.plan == 'elite';
-        final isEliteUser = userProfile.plan == 'elite';
+        // ✅ Bloqueos de suscripción removidos - tabs disponibles para todos
         final isHen = currentRooster.sex == 'hembra';
         final isRooster = currentRooster.sex == 'macho';
 
         List<Tab> tabs = [const Tab(text: 'General')];
         List<Widget> tabViews = [
           _buildGeneralInfoTab(
-              context, isEliteUser, currentRooster, activeGalleraId)
+              context, true, currentRooster, activeGalleraId) // isEliteUser = true
         ];
 
-        if (isMaestroOrHigher) {
-          if (isHen) {
-            tabs.add(const Tab(text: 'Producción'));
-            tabViews.add(_buildProductionTab(context));
-          }
-          tabs.add(const Tab(text: 'Cría'));
-          tabViews
-              .add(_buildBreedingTab(context, activeGalleraId, currentRooster));
-          if (isRooster) {
-            tabs.add(const Tab(text: 'Combates'));
-            tabViews
-                .add(_buildFightsTab(context, activeGalleraId, currentRooster));
-          }
-          tabs.add(const Tab(text: 'Salud'));
-          tabViews
-              .add(_buildHealthTab(context, activeGalleraId, currentRooster));
-          if (isRooster && isEliteUser) {
-            tabs.add(const Tab(text: 'Analítica'));
-            tabViews.add(
-                _buildAnalyticsTab(context, activeGalleraId, currentRooster));
-          }
+        if (isHen) {
+          tabs.add(const Tab(text: 'Producción'));
+          tabViews.add(_buildProductionTab(context));
+        }
+        
+        tabs.add(const Tab(text: 'Cría'));
+        tabViews.add(_buildBreedingTab(context, activeGalleraId, currentRooster));
+        
+        if (isRooster) {
+          tabs.add(const Tab(text: 'Combates'));
+          tabViews.add(_buildFightsTab(context, activeGalleraId, currentRooster));
+        }
+        
+        tabs.add(const Tab(text: 'Salud'));
+        tabViews.add(_buildHealthTab(context, activeGalleraId, currentRooster));
+        
+        if (isRooster) {
+          tabs.add(const Tab(text: 'Analítica'));
+          tabViews.add(
+              _buildAnalyticsTab(context, activeGalleraId, currentRooster));
         }
 
         return Scaffold(
@@ -424,13 +416,10 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
                     background: Hero(
                       tag: currentRooster.id,
                       child: currentRooster.imageUrl.isNotEmpty
-                          ? CachedNetworkImage(
+                          ? OptimizedCachedImage(
                               imageUrl: currentRooster.imageUrl,
                               fit: BoxFit.cover,
-                              placeholder: (c, u) =>
-                                  Container(color: Colors.grey[300]),
-                              errorWidget: (c, u, e) =>
-                                  const Icon(Icons.broken_image))
+                            )
                           : Container(
                               color: Colors.grey[300],
                               child: Center(
@@ -556,11 +545,10 @@ class _RoosterDetailsScreenState extends State<RoosterDetailsScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text("Linaje", style: Theme.of(context).textTheme.titleLarge),
-              if (isEliteUser)
-                TextButton.icon(
-                    icon: const Icon(Icons.account_tree),
-                    label: const Text("Ver Árbol"),
-                    onPressed: () => _goToPedigreeScreen(context, rooster)),
+              TextButton.icon( // ✅ Disponible para todos
+                  icon: const Icon(Icons.account_tree),
+                  label: const Text("Ver Árbol"),
+                  onPressed: () => _goToPedigreeScreen(context, rooster)),
             ],
           ),
           const SizedBox(height: 8),

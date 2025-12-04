@@ -9,6 +9,7 @@ import 'package:roozterfaceapp/providers/rooster_list_provider.dart';
 import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/screens/splash_screen.dart';
 import 'package:roozterfaceapp/services/payment_service.dart';
+import 'package:roozterfaceapp/services/notification_service.dart';
 import 'package:roozterfaceapp/theme/theme_provider.dart';
 import 'firebase_options.dart';
 
@@ -17,6 +18,8 @@ void main() async {
   await initializeDateFormatting('es_ES');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   PaymentService().initialize();
+  // Inicializar notificaciones
+  await NotificationService().initialize();
 
   runApp(
     MultiProvider(

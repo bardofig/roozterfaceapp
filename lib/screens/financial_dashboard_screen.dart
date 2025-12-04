@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/services/financial_service.dart';
+import 'package:roozterfaceapp/widgets/expense_pie_chart.dart';
+import 'package:roozterfaceapp/widgets/trend_chart.dart';
 
 class FinancialDashboardScreen extends StatefulWidget {
   const FinancialDashboardScreen({super.key});
@@ -21,6 +23,9 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
   DateTime? _endDate;
 
   Future<FinancialSummary>? _summaryFuture;
+  // --- VARIABLES PARA NUEVOS GRÁFICOS ---
+  Future<List<Map<String, dynamic>>>? _monthlyFuture;
+  Future<Map<String, double>>? _breakdownFuture;
 
   @override
   void initState() {
@@ -44,6 +49,13 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
           startDate: _startDate!,
           endDate: _endDate!,
         );
+        // Cargar datos para gráficos
+        _monthlyFuture = _financialService.getMonthlyFinancials(
+            galleraId: activeGalleraId, year: _startDate!.year);
+        _breakdownFuture = _financialService.getExpenseCategoryBreakdown(
+            galleraId: activeGalleraId,
+            startDate: _startDate!,
+            endDate: _endDate!);
       });
     }
   }
@@ -76,55 +88,116 @@ class _FinancialDashboardScreenState extends State<FinancialDashboardScreen> {
             .userProfile
             ?.activeGalleraId;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Panel Financiero'),
-      ),
-      body: activeGalleraId == null
-          ? const Center(child: Text('No hay gallera activa.'))
-          : Column(
-              children: [
-                _buildDateFilter(),
-                Expanded(
-                  child: FutureBuilder<FinancialSummary>(
-                    future: _summaryFuture,
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError) {
-                        return Center(
-                            child: Padding(
-                                padding: const EdgeInsets.all(16.0),
-                                child: Text('Error: ${snapshot.error}',
-                                    textAlign: TextAlign.center)));
-                      }
-
-                      final summary = snapshot.data ?? FinancialSummary();
-
-                      return SingleChildScrollView(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          children: [
-                            _buildSummaryCard(
-                                'Ingresos Totales',
-                                summary.totalIncome,
-                                Colors.green,
-                                Icons.arrow_upward),
-                            _buildSummaryCard(
-                                'Gastos Totales',
-                                summary.totalExpenses,
-                                Colors.red,
-                                Icons.arrow_downward),
-                            _buildBalanceCard(summary.netBalance),
-                          ],
-                        ),
-                      );
-                    },
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Panel Financiero'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'Resumen'),
+              Tab(text: 'Tendencias'),
+              Tab(text: 'Desglose'),
+            ],
+          ),
+        ),
+        body: activeGalleraId == null
+            ? const Center(child: Text('No hay gallera activa.'))
+            : Column(
+                children: [
+                  _buildDateFilter(),
+                  Expanded(
+                    child: TabBarView(
+                      children: [
+                        _buildSummaryTab(),
+                        _buildTrendsTab(),
+                        _buildBreakdownTab(),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryTab() {
+    return FutureBuilder<FinancialSummary>(
+      future: _summaryFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        final summary = snapshot.data ?? FinancialSummary();
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              _buildSummaryCard('Ingresos Totales', summary.totalIncome,
+                  Colors.green, Icons.arrow_upward),
+              _buildSummaryCard('Gastos Totales', summary.totalExpenses,
+                  Colors.red, Icons.arrow_downward),
+              _buildBalanceCard(summary.netBalance),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTrendsTab() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _monthlyFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        // Importar localmente para evitar errores si no se ha importado arriba
+        // (Aunque lo ideal es importar arriba, aquí lo hacemos dinámico)
+        // Asumimos que TrendChart ya está importado o lo importaremos
+        return Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Text("Ingresos vs Gastos (Año Actual)",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
             ),
+            Expanded(child: TrendChart(monthlyData: snapshot.data ?? [])),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildBreakdownTab() {
+    return FutureBuilder<Map<String, double>>(
+      future: _breakdownFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+        return Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Text("Distribución de Gastos",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            Expanded(child: ExpensePieChart(categoryData: snapshot.data ?? {})),
+          ],
+        );
+      },
     );
   }
 

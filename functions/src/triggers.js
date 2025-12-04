@@ -50,7 +50,7 @@ exports.onRoosterUpdate = onDocumentWritten("galleras/{galleraId}/gallos/{rooste
                 logger.error(`[${roosterId}] Dueño ${ownerId} no encontrado.`);
                 return showcaseRef.delete();
             }
-            
+
             const ownerName = ownerDoc.data().fullName;
             const galleraName = galleraDoc.data().name;
 
@@ -68,7 +68,7 @@ exports.onRoosterUpdate = onDocumentWritten("galleras/{galleraId}/gallos/{rooste
                 ownerName: ownerName || null, galleraName: galleraName || null,
                 lastUpdate: FieldValue.serverTimestamp(),
             };
-            
+
             await showcaseRef.set(listingData, { merge: true });
         } catch (error) {
             logger.error(`[${roosterId}] Error durante la publicación en escaparate:`, error);
@@ -89,7 +89,7 @@ exports.onRoosterUpdate = onDocumentWritten("galleras/{galleraId}/gallos/{rooste
         };
         await transactionRef.set(transactionData);
     } else {
-        await transactionRef.delete().catch(() => {});
+        await transactionRef.delete().catch(() => { });
     }
 });
 
@@ -138,5 +138,98 @@ exports.onGalleraUpdate = onDocumentWritten("galleras/{galleraId}", async (event
         logger.info(`[Gallera: ${galleraId}] Se sincronizaron ${snapshot.size} anuncios.`);
     } catch (error) {
         logger.error(`[Gallera: ${galleraId}] Error al sincronizar nombre:`, error);
+    }
+});
+
+/**
+ * Notifica al dueño cuando se registra una venta (ingreso).
+ */
+exports.onTransactionCreated = onDocumentWritten("galleras/{galleraId}/transactions/{txnId}", async (event) => {
+    if (!event.data.after.exists) return; // Solo creación o actualización
+    const txnData = event.data.after.data();
+
+    // Solo nos interesan las ventas nuevas
+    if (txnData.category !== 'venta' || txnData.type !== 'ingreso') return;
+    if (event.data.before.exists) return; // Evitar duplicados en actualizaciones
+
+    const galleraId = event.params.galleraId;
+
+    try {
+        // Obtener dueño de la gallera
+        const galleraDoc = await db.collection("galleras").doc(galleraId).get();
+        if (!galleraDoc.exists) return;
+        const ownerId = galleraDoc.data().ownerId;
+
+        // Obtener token del usuario
+        const userDoc = await db.collection("users").doc(ownerId).get();
+        if (!userDoc.exists || !userDoc.data().fcmToken) return;
+
+        const token = userDoc.data().fcmToken;
+        const amount = txnData.amount || 0;
+        const desc = txnData.description || 'Venta registrada';
+
+        const message = {
+            notification: {
+                title: '💰 ¡Nueva Venta Registrada!',
+                body: `${desc}. Monto: $${amount}`,
+            },
+            token: token,
+        };
+
+        const { getMessaging } = require("firebase-admin/messaging");
+        await getMessaging().send(message);
+        logger.info(`Notificación de venta enviada a ${ownerId}`);
+
+    } catch (error) {
+        logger.error("Error enviando notificación de venta:", error);
+    }
+});
+
+/**
+ * Notifica al dueño cuando un combate finaliza.
+ */
+exports.onFightResult = onDocumentWritten("galleras/{galleraId}/fights/{fightId}", async (event) => {
+    if (!event.data.after.exists || !event.data.before.exists) return; // Solo actualizaciones
+
+    const beforeData = event.data.before.data();
+    const afterData = event.data.after.data();
+
+    // Detectar cambio a estado 'Completado'
+    if (beforeData.status !== 'Completado' && afterData.status === 'Completado') {
+        const galleraId = event.params.galleraId;
+
+        try {
+            // Obtener dueño de la gallera
+            const galleraDoc = await db.collection("galleras").doc(galleraId).get();
+            if (!galleraDoc.exists) return;
+            const ownerId = galleraDoc.data().ownerId;
+
+            // Obtener token del usuario
+            const userDoc = await db.collection("users").doc(ownerId).get();
+            if (!userDoc.exists || !userDoc.data().fcmToken) return;
+
+            const token = userDoc.data().fcmToken;
+            const result = afterData.result || 'Finalizado';
+            const opponent = afterData.opponentName || 'Oponente';
+
+            let emoji = '🥊';
+            if (result.toLowerCase() === 'victoria') emoji = '🏆';
+            if (result.toLowerCase() === 'derrota') emoji = '❌';
+
+            const message = {
+                notification: {
+                    title: `${emoji} Resultado del Combate`,
+                    body: `Tu gallo vs ${opponent}: ${result.toUpperCase()}`,
+                },
+                token: token,
+            };
+
+            const { getMessaging } = require("firebase-admin/messaging");
+            await getMessaging().send(message);
+            logger.info(`Notificación de combate enviada a ${ownerId}`);
+
+        } catch (error) {
+            logger.error("Error enviando notificación de combate:", error);
+        }
     }
 });

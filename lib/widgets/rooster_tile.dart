@@ -1,6 +1,6 @@
 // lib/widgets/rooster_tile.dart
 
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:roozterfaceapp/widgets/optimized_cached_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
@@ -67,14 +67,11 @@ class RoosterTile extends StatelessWidget {
               backgroundColor: theme.colorScheme.surface,
               child: rooster.imageUrl.isNotEmpty
                   ? ClipOval(
-                      child: CachedNetworkImage(
+                      child: OptimizedCachedImage(
                         imageUrl: rooster.imageUrl,
                         fit: BoxFit.cover,
                         width: 50,
                         height: 50,
-                        placeholder: (ctx, url) =>
-                            const CircularProgressIndicator(strokeWidth: 2),
-                        errorWidget: (ctx, url, err) => const Icon(Icons.error),
                       ),
                     )
                   : Icon(rooster.sex == 'hembra' ? Icons.female : Icons.male,

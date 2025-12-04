@@ -1,6 +1,6 @@
 // lib/widgets/sale_tile.dart
 
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:roozterfaceapp/widgets/optimized_cached_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
@@ -40,13 +40,9 @@ class SaleTile extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8.0),
                   child: soldRooster.imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
+                      ? OptimizedCachedImage(
                           imageUrl: soldRooster.imageUrl,
                           fit: BoxFit.cover,
-                          placeholder: (context, url) =>
-                              Container(color: Colors.grey.shade300),
-                          errorWidget: (context, url, error) =>
-                              const Icon(Icons.error),
                         )
                       : Container(
                           color: Colors.grey.shade300,

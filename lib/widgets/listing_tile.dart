@@ -1,6 +1,6 @@
 // lib/widgets/listing_tile.dart
 
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:roozterfaceapp/widgets/optimized_cached_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -50,13 +50,9 @@ class ListingTile extends StatelessWidget {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8.0),
                     child: imageUrl.isNotEmpty
-                        ? CachedNetworkImage(
+                        ? OptimizedCachedImage(
                             imageUrl: imageUrl,
                             fit: BoxFit.cover,
-                            placeholder: (context, url) =>
-                                Container(color: Colors.grey.shade300),
-                            errorWidget: (context, url, error) =>
-                                const Icon(Icons.error),
                           )
                         : Container(
                             color: Colors.grey.shade300,

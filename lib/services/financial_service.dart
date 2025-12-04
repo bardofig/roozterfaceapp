@@ -96,4 +96,94 @@ class FinancialService {
       netBalance: netBalance,
     );
   }
+  // --- NUEVOS MÉTODOS PARA DASHBOARD ---
+
+  /// Obtiene datos financieros agrupados por mes para un año específico
+  Future<List<Map<String, dynamic>>> getMonthlyFinancials({
+    required String galleraId,
+    required int year,
+  }) async {
+    final startOfYear = DateTime(year, 1, 1);
+    final endOfYear = DateTime(year, 12, 31, 23, 59, 59);
+
+    final transactionsRef = _firestore
+        .collection('galleras')
+        .doc(galleraId)
+        .collection('transactions');
+
+    final querySnapshot = await transactionsRef
+        .where('date', isGreaterThanOrEqualTo: startOfYear)
+        .where('date', isLessThanOrEqualTo: endOfYear)
+        .get();
+
+    // Inicializar mapa de meses (1-12)
+    Map<int, Map<String, double>> monthlyData = {};
+    for (int i = 1; i <= 12; i++) {
+      monthlyData[i] = {'income': 0.0, 'expense': 0.0};
+    }
+
+    for (var doc in querySnapshot.docs) {
+      final data = doc.data();
+      final date = (data['date'] as Timestamp).toDate();
+      final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+      final type = data['type'] as String?;
+      final month = date.month;
+
+      if (type == 'ingreso') {
+        monthlyData[month]!['income'] = monthlyData[month]!['income']! + amount;
+      } else if (type == 'gasto') {
+        monthlyData[month]!['expense'] =
+            monthlyData[month]!['expense']! + amount;
+      }
+    }
+
+    // Convertir a lista ordenada
+    List<Map<String, dynamic>> result = [];
+    monthlyData.forEach((month, values) {
+      result.add({
+        'month': month,
+        'income': values['income'],
+        'expense': values['expense'],
+      });
+    });
+
+    return result;
+  }
+
+  /// Obtiene el desglose de gastos por categoría
+  Future<Map<String, double>> getExpenseCategoryBreakdown({
+    required String galleraId,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final endOfDay =
+        DateTime(endDate.year, endDate.month, endDate.day, 23, 59, 59);
+
+    final transactionsRef = _firestore
+        .collection('galleras')
+        .doc(galleraId)
+        .collection('transactions');
+
+    final querySnapshot = await transactionsRef
+        .where('type', isEqualTo: 'gasto')
+        .where('date', isGreaterThanOrEqualTo: startDate)
+        .where('date', isLessThanOrEqualTo: endOfDay)
+        .get();
+
+    Map<String, double> breakdown = {};
+
+    for (var doc in querySnapshot.docs) {
+      final data = doc.data();
+      final category = data['category'] as String? ?? 'Otros';
+      final amount = (data['amount'] as num?)?.toDouble() ?? 0.0;
+
+      if (breakdown.containsKey(category)) {
+        breakdown[category] = breakdown[category]! + amount;
+      } else {
+        breakdown[category] = amount;
+      }
+    }
+
+    return breakdown;
+  }
 }

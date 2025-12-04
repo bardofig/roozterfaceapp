@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart'; // ✅ Agregado
 import 'package:roozterfaceapp/models/rooster_model.dart';
 import 'package:roozterfaceapp/models/user_model.dart';
 
@@ -20,6 +21,29 @@ class RoosterService {
         .collection('galleras')
         .doc(galleraId)
         .collection('gallos');
+  }
+
+  /// Comprime una imagen para reducir su tamaño antes de subirla a Firebase Storage.
+  /// Reduce el tamaño en aproximadamente 70-85% manteniendo buena calidad.
+  Future<File?> _compressImage(File file) async {
+    try {
+      final filePath = file.absolute.path;
+      final lastIndex = filePath.lastIndexOf('.');
+      final outPath = '\${filePath.substring(0, lastIndex)}_compressed.jpg';
+
+      final result = await FlutterImageCompress.compressAndGetFile(
+        file.absolute.path,
+        outPath,
+        quality: 85, // Calidad 85% - buen balance entre tamaño y calidad
+        minWidth: 1024, // Ancho máximo 1024px
+        minHeight: 1024, // Alto máximo 1024px
+      );
+
+      return result != null ? File(result.path) : file;
+    } catch (e) {
+      print("Error al comprimir imagen: \$e");
+      return file; // Si falla la compresión, usar imagen original
+    }
   }
 
   Future<UserModel?> getUserProfile() async {
@@ -53,6 +77,27 @@ class RoosterService {
           .map((doc) => RoosterModel.fromFirestore(doc))
           .toList();
     });
+  }
+
+  /// Obtiene una página de gallos para scroll infinito.
+  Future<QuerySnapshot> getRoostersPage({
+    required String galleraId,
+    int limit = 20,
+    DocumentSnapshot? startAfter,
+  }) async {
+    if (galleraId.isEmpty) {
+      throw Exception("Gallera ID no puede estar vacío");
+    }
+
+    Query query = _roostersCollection(galleraId)
+        .orderBy('createdAt', descending: true)
+        .limit(limit);
+
+    if (startAfter != null) {
+      query = query.startAfterDocument(startAfter);
+    }
+
+    return await query.get();
   }
 
   Future<RoosterModel?> getRoosterById(
@@ -114,11 +159,18 @@ class RoosterService {
     String? areaName,
   }) async {
     if (currentUserId == null) throw Exception("Usuario no autenticado.");
+    
+    // ✅ Comprimir imagen antes de subir
+    final compressedImage = await _compressImage(imageFile);
+    if (compressedImage == null) {
+      throw Exception("Error al procesar la imagen.");
+    }
+    
     String filePath =
         'users/$currentUserId/gallos/${DateTime.now().millisecondsSinceEpoch}.jpg';
     Reference photoRef = _storage.ref().child(filePath);
     try {
-      UploadTask uploadTask = photoRef.putFile(imageFile);
+      UploadTask uploadTask = photoRef.putFile(compressedImage); // ✅ Usar imagen comprimida
       TaskSnapshot snapshot = await uploadTask;
       String downloadUrl = await snapshot.ref.getDownloadURL();
 
@@ -195,10 +247,16 @@ class RoosterService {
     Reference? newPhotoRef;
     try {
       if (newImageFile != null) {
+        // ✅ Comprimir imagen antes de subir
+        final compressedImage = await _compressImage(newImageFile);
+        if (compressedImage == null) {
+          throw Exception("Error al procesar la imagen.");
+        }
+        
         String filePath =
             'users/$currentUserId/gallos/${DateTime.now().millisecondsSinceEpoch}.jpg';
         newPhotoRef = _storage.ref().child(filePath);
-        UploadTask uploadTask = newPhotoRef.putFile(newImageFile);
+        UploadTask uploadTask = newPhotoRef.putFile(compressedImage); // ✅ Usar imagen comprimida
         TaskSnapshot snapshot = await uploadTask;
         imageUrl = await snapshot.ref.getDownloadURL();
       }

@@ -362,12 +362,13 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isMaestroOrHigher = widget.currentUserPlan != 'iniciacion';
-    final isEliteUser = widget.currentUserPlan == 'elite';
+    // ✅ Bloqueos de suscripción removidos - todos tienen acceso completo
+    final isMaestroOrHigher = true;
+    final isEliteUser = true;
     bool showSalePriceField =
         _selectedStatus == 'En Venta' || _selectedStatus == 'Vendido';
     bool showSoldFields = _selectedStatus == 'Vendido';
-    bool showShowcaseSwitch = _selectedStatus == 'En Venta' && isEliteUser;
+    bool showShowcaseSwitch = _selectedStatus == 'En Venta'; // Disponible para todos
 
     return Scaffold(
       appBar: AppBar(

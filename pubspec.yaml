@@ -19,6 +19,7 @@ dependencies:
   cloud_firestore: ^4.15.8
   firebase_storage: ^11.6.9
   cloud_functions: ^4.6.8
+  firebase_messaging: ^14.7.9
   
   # Dependencias de UI y Utilidades
   google_fonts: ^6.2.1
@@ -37,6 +38,7 @@ dependencies:
   path_provider: ^2.1.5
  # open_file_plus: ^3.4.1+1
   open_filex: ^4.7.0
+  flutter_image_compress: ^2.3.0
 
 dev_dependencies:
   flutter_test:

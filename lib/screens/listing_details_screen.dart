@@ -1,6 +1,6 @@
 // lib/screens/listing_details_screen.dart
 
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:roozterfaceapp/widgets/optimized_cached_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -107,11 +107,9 @@ class ListingDetailsScreen extends StatelessWidget {
               child: Hero(
                 tag: 'listing_$roosterId',
                 child: imageUrl.isNotEmpty
-                    ? CachedNetworkImage(
+                    ? OptimizedCachedImage(
                         imageUrl: imageUrl,
                         fit: BoxFit.cover,
-                        placeholder: (c, u) => Container(color: Colors.grey[300]),
-                        errorWidget: (c, u, e) => const Icon(Icons.broken_image),
                       )
                     : Container(
                         color: Colors.grey[300],
