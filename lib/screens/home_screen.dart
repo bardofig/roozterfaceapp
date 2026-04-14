@@ -19,15 +19,28 @@ import 'package:roozterfaceapp/screens/invitations_screen.dart';
 import 'package:roozterfaceapp/screens/marketplace_screen.dart';
 import 'package:roozterfaceapp/screens/profile_screen.dart';
 import 'package:roozterfaceapp/screens/public_showcase_screen.dart';
+import 'package:roozterfaceapp/screens/qr_scanner_screen.dart';
 import 'package:roozterfaceapp/screens/rooster_details_screen.dart';
-import 'package:roozterfaceapp/screens/sales_history_screen.dart';
 import 'package:roozterfaceapp/screens/subscription_screen.dart';
+import 'package:roozterfaceapp/screens/create_partido_screen.dart';
+import 'package:roozterfaceapp/screens/partido_management_screen.dart';
+import 'package:roozterfaceapp/screens/partido_leaderboard_screen.dart'; // ✅ NUEVO
+import 'package:roozterfaceapp/screens/help_center_screen.dart'; // ✅ NUEVO
+import 'package:roozterfaceapp/screens/sales_history_screen.dart'; // ✅ RESTAURADO
+import 'package:roozterfaceapp/screens/tournament_list_screen.dart'; // ✅ NUEVO
 import 'package:roozterfaceapp/services/auth_service.dart';
+import 'package:roozterfaceapp/services/partido_service.dart';
+import 'package:roozterfaceapp/models/partido_model.dart';
+import 'package:roozterfaceapp/services/chat_service.dart';
 import 'package:roozterfaceapp/services/chat_service.dart';
 import 'package:roozterfaceapp/services/invitation_service.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';
 import 'package:roozterfaceapp/theme/theme_provider.dart';
 import 'package:roozterfaceapp/widgets/rooster_list_view.dart';
+import 'package:roozterfaceapp/widgets/dashboard_summary.dart';
+import 'package:roozterfaceapp/services/pdf_service.dart';
+import 'package:roozterfaceapp/providers/gallera_data_provider.dart';
+import 'package:roozterfaceapp/widgets/main_drawer.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -42,6 +55,7 @@ class _HomeScreenState extends State<HomeScreen>
   final RoosterService _roosterService = RoosterService();
   final InvitationService _invitationService = InvitationService();
   final ChatService _chatService = ChatService();
+  final PdfService _pdfService = PdfService();
 
   @override
   void initState() {
@@ -80,30 +94,7 @@ class _HomeScreenState extends State<HomeScreen>
             builder: (context) => RoosterDetailsScreen(rooster: rooster)));
   }
 
-  void _showLimitDialog() {
-    showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-              title: const Text("Límite Alcanzado"),
-              content: const Text(
-                  "Has alcanzado el límite de 15 gallos. ¡Mejora tu plan para añadir más!"),
-              actions: [
-                TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text("Entendido")),
-                TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) =>
-                                  const SubscriptionScreen()));
-                    },
-                    child: const Text("Mejorar Plan")),
-              ],
-            ));
-  }
+
 
   Future<bool> _deleteRooster(
       BuildContext context, RoosterModel rooster) async {
@@ -115,7 +106,12 @@ class _HomeScreenState extends State<HomeScreen>
     try {
       await _roosterService.deleteRooster(
           galleraId: activeGalleraId, rooster: rooster);
+      
       if (mounted) {
+        // Actualizar la lista localmente
+        Provider.of<RoosterListProvider>(context, listen: false)
+            .removeRoosterLocally(rooster.id!);
+
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('"${rooster.name}" ha sido borrado.')));
       }
@@ -152,36 +148,53 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<UserDataProvider, RoosterListProvider>(
-      builder: (context, userProvider, roosterProvider, child) {
+    return Consumer3<UserDataProvider, RoosterListProvider, GalleraDataProvider>(
+      builder: (context, userProvider, roosterProvider, galleraProvider, child) {
         final userProfile = userProvider.userProfile!;
         final activeGalleraId = userProfile.activeGalleraId;
+        final String galleraName = galleraProvider.galleraData?['name'] ?? 'Mi Gallera';
 
         if (activeGalleraId == null || activeGalleraId.isEmpty) {
           return Scaffold(
+            backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+            drawer: const MainDrawer(),
             appBar: AppBar(
-                title: const Text('Mis Ejemplares'),
-                actions: [_buildInvitationsButton(), _buildChatButton()]),
-            drawer: _buildDrawer(context, userProfile),
+                title: const Text('Mi Gallera'),
+                backgroundColor: Colors.transparent,
+                actions: [
+                  IconButton(icon: const Icon(Icons.help_outline), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpCenterScreen()))),
+                  _buildInvitationsButton(), 
+                  _buildChatButton()
+                ]),
             body: _buildWelcomeMessage(),
           );
         }
 
         final allRoosters = roosterProvider.roosters;
-        // ✅ Bloqueo de suscripción removido - todos pueden agregar gallos ilimitados
-        final canAddRooster = true;
 
         return Scaffold(
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+          drawer: const MainDrawer(),
           appBar: AppBar(
-            title: const Text('Mis Ejemplares'),
-            actions: [_buildInvitationsButton(), _buildChatButton()],
+            title: Text(galleraName),
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            actions: [
+              IconButton(icon: const Icon(Icons.help_outline), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HelpCenterScreen()))),
+              _buildPdfExportButton(allRoosters, galleraName),
+              _buildInvitationsButton(),
+              _buildChatButton()
+            ],
             bottom: roosterProvider.isLoading
                 ? const PreferredSize(
                     preferredSize: Size.fromHeight(4.0),
-                    child: LinearProgressIndicator(),
+                    child: LinearProgressIndicator(color: Colors.amber),
                   )
                 : TabBar(
                     controller: _tabController,
+                    indicatorColor: Colors.amber,
+                    labelColor: Colors.amber,
+                    unselectedLabelColor: Colors.white38,
                     tabs: [
                       Tab(text: 'Todos (${allRoosters.length})'),
                       Tab(
@@ -193,7 +206,6 @@ class _HomeScreenState extends State<HomeScreen>
                     ],
                   ),
           ),
-          drawer: _buildDrawer(context, userProfile),
           floatingActionButton: FloatingActionButton(
             onPressed: () => addRooster(context), // ✅ Sin validación de límite
             backgroundColor: Theme.of(context).colorScheme.primary,
@@ -202,32 +214,40 @@ class _HomeScreenState extends State<HomeScreen>
           ),
           body: roosterProvider.isLoading
               ? const Center(child: CircularProgressIndicator())
-              : TabBarView(
-                  controller: _tabController,
+              : Column(
                   children: [
-                    RoosterListView(
-                        roosters: allRoosters,
-                        onDelete: (r) => _confirmDelete(context, r),
-                        onTap: (r) => goToRoosterDetails(context, r),
-                        onLoadMore: roosterProvider.loadMore,
-                        isLoadingMore: roosterProvider.isLoadingMore,
-                    ),
-                    RoosterListView(
-                        roosters:
-                            allRoosters.where((r) => r.sex == 'macho').toList(),
-                        onDelete: (r) => _confirmDelete(context, r),
-                        onTap: (r) => goToRoosterDetails(context, r),
-                        onLoadMore: roosterProvider.loadMore,
-                        isLoadingMore: roosterProvider.isLoadingMore,
-                    ),
-                    RoosterListView(
-                        roosters: allRoosters
-                            .where((r) => r.sex == 'hembra')
-                            .toList(),
-                        onDelete: (r) => _confirmDelete(context, r),
-                        onTap: (r) => goToRoosterDetails(context, r),
-                        onLoadMore: roosterProvider.loadMore,
-                        isLoadingMore: roosterProvider.isLoadingMore,
+                    DashboardSummary(roosters: allRoosters),
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          RoosterListView(
+                            roosters: allRoosters,
+                            onDelete: (r) => _confirmDelete(context, r),
+                            onTap: (r) => goToRoosterDetails(context, r),
+                            onLoadMore: roosterProvider.loadMore,
+                            isLoadingMore: roosterProvider.isLoadingMore,
+                          ),
+                          RoosterListView(
+                            roosters: allRoosters
+                                .where((r) => r.sex == 'macho')
+                                .toList(),
+                            onDelete: (r) => _confirmDelete(context, r),
+                            onTap: (r) => goToRoosterDetails(context, r),
+                            onLoadMore: roosterProvider.loadMore,
+                            isLoadingMore: roosterProvider.isLoadingMore,
+                          ),
+                          RoosterListView(
+                            roosters: allRoosters
+                                .where((r) => r.sex == 'hembra')
+                                .toList(),
+                            onDelete: (r) => _confirmDelete(context, r),
+                            onTap: (r) => goToRoosterDetails(context, r),
+                            onLoadMore: roosterProvider.loadMore,
+                            isLoadingMore: roosterProvider.isLoadingMore,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -350,176 +370,29 @@ class _HomeScreenState extends State<HomeScreen>
             ])));
   }
 
-  Widget _buildDrawer(BuildContext context, UserModel userProfile) {
-    // ✅ Bloqueos de suscripción removidos - todas las funcionalidades disponibles
-    return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          _buildDrawerHeader(context, userProfile),
-          _buildDrawerSectionHeader(context, 'Mercado'),
-          _buildDrawerItem(context,
-              icon: Icons.shopping_basket_outlined,
-              title: 'Mercado de Ejemplares',
-              onTap: () => _navigateTo(context, const MarketplaceScreen())),
-          _buildDrawerItem(context, // ✅ Disponible para todos
-              icon: Icons.storefront_outlined,
-              title: 'Mi Escaparate Público',
-              onTap: () =>
-                  _navigateTo(context, const PublicShowcaseScreen())),
-          _buildDrawerSectionHeader(context, 'Mi Gallera'),
-          _buildDrawerItem(context,
-              icon: Icons.swap_horiz,
-              title: 'Cambiar Gallera',
-              onTap: () => _navigateTo(context, const GalleraSwitcherScreen())),
-          _buildDrawerItem(context, // ✅ Disponible para todos
-              icon: Icons.groups_outlined,
-              title: 'Gestionar Miembros',
-              onTap: () =>
-                  _navigateTo(context, const GalleraManagementScreen())),
-          _buildDrawerItem(context, // ✅ Disponible para todos
-              icon: Icons.map_outlined,
-              title: 'Gestionar Áreas',
-              onTap: () =>
-                  _navigateTo(context, const AreaManagementScreen())),
-          _buildDrawerItem(context, // ✅ Disponible para todos
-              icon: Icons.auto_stories,
-              title: 'Libro de Cría',
-              onTap: () => _navigateTo(context, const BreedingListScreen())),
-          _buildDrawerSectionHeader(context, 'Registros y Finanzas'), // ✅ Disponible para todos
-          _buildDrawerItem(context,
-              icon: Icons.analytics_outlined,
-              title: 'Panel Financiero',
-              onTap: () =>
-                  _navigateTo(context, const FinancialDashboardScreen())),
-          _buildDrawerItem(context,
-              icon: Icons.monetization_on_outlined,
-              title: 'Registro de Ventas',
-              onTap: () => _navigateTo(context, const SalesHistoryScreen())),
-          _buildDrawerItem(context,
-              icon: Icons.request_quote_outlined,
-              title: 'Registro de Gastos',
-              onTap: () => _navigateTo(context, const ExpensesScreen())),
-          _buildDrawerSectionHeader(context, 'Cuenta'),
-          _buildDrawerItem(context,
-              icon: Icons.account_circle_outlined,
-              title: 'Mi Perfil',
-              onTap: () => _navigateTo(context, const ProfileScreen())),
-          _buildDrawerItem(context,
-              icon: Icons.workspace_premium_outlined,
-              title: 'Planes y Suscripción',
-              onTap: () => _navigateTo(context, const SubscriptionScreen())),
-          const Divider(height: 24, thickness: 0.5),
-          ListTile(
-            leading: Icon(Provider.of<ThemeProvider>(context).isDarkMode
-                ? Icons.dark_mode_outlined
-                : Icons.light_mode_outlined),
-            title: const Text('Tema Oscuro'),
-            trailing: Switch(
-              value:
-                  Provider.of<ThemeProvider>(context, listen: false).isDarkMode,
-              onChanged: (value) {
-                Provider.of<ThemeProvider>(context, listen: false)
-                    .toggleTheme();
-              },
-            ),
-          ),
-          ListTile(
-            leading: Icon(Icons.logout, color: Colors.red.shade400),
-            title: Text('Cerrar Sesión',
-                style: TextStyle(color: Colors.red.shade400)),
-            onTap: () {
-              Navigator.pop(context);
-              signOut();
+
+  Widget _buildPdfExportButton(List<RoosterModel> roosters, String galleraName) {
+    return IconButton(
+      icon: const Icon(Icons.picture_as_pdf_outlined),
+      tooltip: 'Exportar PDF',
+      onPressed: roosters.isEmpty
+          ? null
+          : () async {
+              try {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Generando PDF...')));
+                await _pdfService.generateInventoryPdf(
+                  roosters: roosters,
+                  galleraName: galleraName,
+                );
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('Error al generar PDF: ${e.toString()}'),
+                      backgroundColor: Colors.red));
+                }
+              }
             },
-          ),
-        ],
-      ),
     );
-  }
-
-  Widget _buildDrawerHeader(BuildContext context, UserModel userProfile) {
-    return SizedBox(
-      height: 220,
-      child: DrawerHeader(
-        padding: const EdgeInsets.all(8.0),
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surface),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12.0),
-          child: Stack(
-            children: [
-              Positioned.fill(
-                  child: Transform.flip(
-                      flipX: true,
-                      child: Image.asset('assets/images/Icono-Roozterface.png',
-                          fit: BoxFit.cover,
-                          color: Colors.black.withOpacity(0.5),
-                          colorBlendMode: BlendMode.darken))),
-              Positioned(
-                bottom: 12.0,
-                left: 12.0,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(userProfile.fullName,
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            shadows: [
-                              Shadow(blurRadius: 3, color: Colors.black)
-                            ])),
-                    const SizedBox(height: 4),
-                    Text(userProfile.email,
-                        style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                            shadows: [
-                              Shadow(blurRadius: 2, color: Colors.black)
-                            ])),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDrawerSectionHeader(BuildContext context, String title) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      margin: const EdgeInsets.only(top: 12.0),
-      decoration:
-          BoxDecoration(color: theme.colorScheme.primary.withOpacity(0.05)),
-      child: Text(
-        title.toUpperCase(),
-        style: theme.textTheme.titleSmall?.copyWith(
-            color: theme.colorScheme.secondary,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1.5),
-      ),
-    );
-  }
-
-  Widget _buildDrawerItem(BuildContext context,
-      {required IconData icon,
-      required String title,
-      required VoidCallback onTap}) {
-    return ListTile(
-      leading: Icon(icon, size: 22),
-      title: Text(title),
-      onTap: onTap,
-      dense: true,
-      visualDensity: VisualDensity.compact,
-    );
-  }
-
-  void _navigateTo(BuildContext context, Widget screen) {
-    Navigator.pop(context);
-    Navigator.push(context, MaterialPageRoute(builder: (context) => screen));
   }
 }

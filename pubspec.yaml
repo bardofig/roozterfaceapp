@@ -22,7 +22,7 @@ dependencies:
   firebase_messaging: ^14.7.9
   
   # Dependencias de UI y Utilidades
-  google_fonts: ^6.2.1
+  google_fonts: ^6.3.1
   provider: ^6.1.2
   intl: ^0.20.2 # La última versión estable
   image_picker: ^1.0.7
@@ -39,6 +39,8 @@ dependencies:
  # open_file_plus: ^3.4.1+1
   open_filex: ^4.7.0
   flutter_image_compress: ^2.3.0
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^7.2.0
 
 dev_dependencies:
   flutter_test:

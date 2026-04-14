@@ -105,7 +105,7 @@ class AuthService {
       'activeGalleraId': galleraRef.id, // Asignar la nueva gallera como activa
       'galleraIds': FieldValue.arrayUnion([galleraRef.id]), // Añadir a la lista
     };
-    batch.update(userRef, userProfileUpdates);
+    batch.set(userRef, userProfileUpdates, SetOptions(merge: true));
 
     // 3. Ejecutar ambas operaciones de forma atómica
     await batch.commit();

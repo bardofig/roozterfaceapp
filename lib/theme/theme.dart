@@ -1,57 +1,75 @@
 // lib/theme/theme.dart
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
-// --- TEMA CLARO CON COLORES PASTEL PARA EL CHAT ---
+// --- TEMA CLARO PREMIUM ---
 ThemeData lightTheme = ThemeData(
   brightness: Brightness.light,
+  useMaterial3: true,
+  textTheme: GoogleFonts.outfitTextTheme(ThemeData.light().textTheme),
   appBarTheme: AppBarTheme(
-    backgroundColor: Colors.grey.shade300,
-    foregroundColor: Colors.black,
-    elevation: 1, // Añade una sombra sutil
+    backgroundColor: const Color(0xFFF5F5F5),
+    foregroundColor: const Color(0xFF121212),
+    elevation: 0,
+    centerTitle: true,
+    titleTextStyle: GoogleFonts.outfit(
+      color: const Color(0xFF121212),
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
+    ),
   ),
-  colorScheme: ColorScheme.light(
-    surface: Colors.grey.shade200,
-    primary: Colors.black,
+  colorScheme: const ColorScheme.light(
+    surface: Color(0xFFFBFBFB),
+    onSurface: Color(0xFF121212),
+    primary: Color(0xFF121212),
     onPrimary: Colors.white,
-    secondary: Colors.blue.shade800,
-    onSurface: Colors.black,
-    // Colores para contenedores del chat
-    secondaryContainer: const Color(0xFFE3F2FD),
-    onSecondaryContainer: const Color(0xFF1565C0),
-    surfaceContainerHighest: Colors.grey.shade300,
+    secondary: Color(0xFFB8860B), // Dorado Elegante (Dark Goldenrod)
+    onSecondary: Colors.white,
+    secondaryContainer: Color(0xFFE8EAF6),
+    onSecondaryContainer: Color(0xFF1A237E),
   ),
-  // --- SECCIÓN CORREGIDA Y DEFINITIVA ---
-  tabBarTheme: const TabBarThemeData(
-    labelColor: Colors.black,
-    unselectedLabelColor: Colors.black54,
-    indicatorColor: Colors.black,
+  scaffoldBackgroundColor: const Color(0xFFFBFBFB),
+  cardTheme: CardThemeData(
+    color: Colors.white,
+    elevation: 2,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
   ),
-  cardColor: Colors.white,
 );
 
-// --- TEMA OSCURO CON COLORES SUTILES PARA EL CHAT ---
+// --- TEMA OSCURO PREMIUM ---
 ThemeData darkTheme = ThemeData(
   brightness: Brightness.dark,
+  useMaterial3: true,
+  textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
   appBarTheme: AppBarTheme(
-    backgroundColor: Colors.grey.shade900,
+    backgroundColor: Colors.black,
     foregroundColor: Colors.white,
-    elevation: 1, // Añade una sombra sutil
+    elevation: 0,
+    centerTitle: true,
+    titleTextStyle: GoogleFonts.outfit(
+      color: Colors.white,
+      fontSize: 20,
+      fontWeight: FontWeight.bold,
+    ),
   ),
-  colorScheme: ColorScheme.dark(
-    surface: Colors.black,
+  colorScheme: const ColorScheme.dark(
+    surface: Color(0xFF000000),
+    onSurface: Colors.white,
     primary: Colors.white,
-    secondary: Colors.amber.shade700,
-    // Colores para contenedores del chat
-    secondaryContainer: const Color(0xFF263238),
-    onSecondaryContainer: const Color(0xFFCFD8DC),
-    surfaceContainerHighest: Colors.grey.shade800,
+    onPrimary: Colors.black,
+    secondary: Color(0xFFFFB300), // Ámbar Vibrante
+    onSecondary: Colors.black,
+    secondaryContainer: Color(0xFF1A1A1A),
+    onSecondaryContainer: Color(0xFFFFB300),
   ),
-  // --- SECCIÓN CORREGIDA Y DEFINITIVA ---
-  tabBarTheme: const TabBarThemeData(
-    labelColor: Colors.white,
-    unselectedLabelColor: Colors.white70,
-    indicatorColor: Colors.white,
+  scaffoldBackgroundColor: Colors.black,
+  cardTheme: CardThemeData(
+    color: const Color(0xFF121212),
+    elevation: 0,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: const BorderSide(color: Colors.white10),
+    ),
   ),
-  cardColor: Colors.grey[850],
 );

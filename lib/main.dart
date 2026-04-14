@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
+import 'package:roozterfaceapp/providers/gallera_data_provider.dart';
 import 'package:roozterfaceapp/providers/rooster_list_provider.dart';
 import 'package:roozterfaceapp/providers/user_data_provider.dart';
 import 'package:roozterfaceapp/screens/splash_screen.dart';
 import 'package:roozterfaceapp/services/payment_service.dart';
-import 'package:roozterfaceapp/services/notification_service.dart';
+// NotificationService se inicializa en UserDataProvider tras el login
 import 'package:roozterfaceapp/theme/theme_provider.dart';
 import 'firebase_options.dart';
 
@@ -18,14 +19,18 @@ void main() async {
   await initializeDateFormatting('es_ES');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   PaymentService().initialize();
-  // Inicializar notificaciones
-  await NotificationService().initialize();
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => UserDataProvider()),
+        ChangeNotifierProxyProvider<UserDataProvider, GalleraDataProvider>(
+          create: (context) => GalleraDataProvider(
+            Provider.of<UserDataProvider>(context, listen: false),
+          ),
+          update: (context, userData, previous) => GalleraDataProvider(userData),
+        ),
         ChangeNotifierProvider(create: (_) => RoosterListProvider()),
       ],
       child: const MyApp(),

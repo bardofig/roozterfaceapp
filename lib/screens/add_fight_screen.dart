@@ -3,8 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart'; // ✅ NUEVO
 import 'package:roozterfaceapp/data/options_data.dart';
 import 'package:roozterfaceapp/models/fight_model.dart';
+import 'package:roozterfaceapp/providers/user_data_provider.dart'; // ✅ NUEVO
 import 'package:roozterfaceapp/services/fight_service.dart';
 
 class AddFightScreen extends StatefulWidget {
@@ -131,12 +133,17 @@ class _AddFightScreenState extends State<AddFightScreen> {
           netProfit: netProfit,
         );
       } else {
+        // Obtenemos el partido activo si existe
+        final userProvider = Provider.of<UserDataProvider>(context, listen: false);
+        final partidoId = userProvider.userProfile?.activePartidoId;
+
         await _fightService.addFight(
           galleraId: widget.galleraId,
           roosterId: widget.roosterId,
           date: _selectedDate!,
           location: _locationController.text.trim(),
           preparationNotes: _prepNotesController.text.trim(),
+          partidoId: partidoId, // ✅ PASAMOS EL PARTIDO
         );
       }
       if (mounted) {
@@ -208,7 +215,7 @@ class _AddFightScreenState extends State<AddFightScreen> {
                       textCapitalization: TextCapitalization.words),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      initialValue: _selectedResult,
+                      value: _selectedResult,
                       decoration:
                           const InputDecoration(labelText: 'Resultado *'),
                       items: _results
@@ -222,7 +229,7 @@ class _AddFightScreenState extends State<AddFightScreen> {
                       }),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      initialValue: _selectedWeaponType,
+                      value: _selectedWeaponType,
                       isExpanded: true,
                       decoration:
                           const InputDecoration(labelText: 'Arma Utilizada'),
@@ -237,7 +244,7 @@ class _AddFightScreenState extends State<AddFightScreen> {
                       }),
                   const SizedBox(height: 16),
                   DropdownButtonFormField<String>(
-                      initialValue: _selectedDuration,
+                      value: _selectedDuration,
                       isExpanded: true,
                       decoration: const InputDecoration(
                           labelText: 'Duración de la Pelea'),

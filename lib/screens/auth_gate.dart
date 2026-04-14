@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:roozterfaceapp/screens/complete_profile_screen.dart'; // <-- ¡NUEVA IMPORTACIÓN!
 import 'package:roozterfaceapp/screens/login_or_register_screen.dart';
 import 'package:roozterfaceapp/providers/user_data_provider.dart';
-import 'package:roozterfaceapp/screens/home_screen.dart';
+import 'package:roozterfaceapp/screens/main_navigation_screen.dart'; // ✅ NUEVO
 
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
@@ -36,14 +36,15 @@ class AuthGate extends StatelessWidget {
               // --- ¡NUEVO PUESTO DE CONTROL 3! ---
               // ¿El perfil del usuario está completo?
               // Usamos `fullName` como indicador clave. Si está vacío, el perfil no se ha completado.
-              final isProfileComplete =
+              // TAMBIÉN: Si el perfil es nulo (no existe en Firestore), lo enviamos a crear uno.
+              final isProfileComplete = userProvider.userProfile != null &&
                   userProvider.userProfile!.fullName.trim().isNotEmpty;
 
               if (isProfileComplete) {
-                // Si el perfil está completo, va a la pantalla principal.
-                return const HomeScreen();
+                // Si el perfil está completo, va al shell de navegación principal
+                return const MainNavigationScreen();
               } else {
-                // Si el perfil NO está completo, se le dirige a la pantalla para completarlo.
+                // Si el perfil NO está completo o NO EXISTE, se le dirige a la pantalla para completarlo.
                 return const CompleteProfileScreen();
               }
             },

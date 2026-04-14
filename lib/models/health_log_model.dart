@@ -34,4 +34,16 @@ class HealthLogModel {
       notes: data['notes'] ?? '',
     );
   }
+
+  /// Convierte el modelo a un mapa para escritura en Firestore.
+  Map<String, dynamic> toMap() {
+    return {
+      'date': Timestamp.fromDate(date),
+      'logCategory': logCategory,
+      'productName': productName,
+      'illnessOrCondition': illnessOrCondition,
+      'dosage': dosage,
+      'notes': notes,
+    };
+  }
 }

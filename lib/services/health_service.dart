@@ -47,15 +47,16 @@ class HealthService {
     required String notes,
   }) async {
     try {
-      Map<String, dynamic> logData = {
-        'date': Timestamp.fromDate(date),
-        'logCategory': logCategory,
-        'productName': productName,
-        'illnessOrCondition': illnessOrCondition,
-        'dosage': dosage,
-        'notes': notes,
-      };
-      await _healthLogsCollection(galleraId, roosterId).add(logData);
+      final log = HealthLogModel(
+        id: '',
+        date: date,
+        logCategory: logCategory,
+        productName: productName,
+        illnessOrCondition: illnessOrCondition,
+        dosage: dosage,
+        notes: notes,
+      );
+      await _healthLogsCollection(galleraId, roosterId).add(log.toMap());
     } catch (e) {
       throw Exception("Ocurrió un error al guardar el registro de salud.");
     }
@@ -74,18 +75,19 @@ class HealthService {
     required String notes,
   }) async {
     try {
-      Map<String, dynamic> logData = {
-        'date': Timestamp.fromDate(date),
-        'logCategory': logCategory,
-        'productName': productName,
-        'illnessOrCondition': illnessOrCondition,
-        'dosage': dosage,
-        'notes': notes,
-      };
+      final log = HealthLogModel(
+        id: logId,
+        date: date,
+        logCategory: logCategory,
+        productName: productName,
+        illnessOrCondition: illnessOrCondition,
+        dosage: dosage,
+        notes: notes,
+      );
       await _healthLogsCollection(
         galleraId,
         roosterId,
-      ).doc(logId).update(logData);
+      ).doc(logId).update(log.toMap());
     } catch (e) {
       throw Exception("Ocurrió un error al actualizar el registro de salud.");
     }

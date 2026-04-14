@@ -6,12 +6,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart'; // ✅ Agregado
 import 'package:roozterfaceapp/models/rooster_model.dart';
+import 'package:roozterfaceapp/services/financial_service.dart'; // ✅ AGREGADO
 import 'package:roozterfaceapp/models/user_model.dart';
 
 class RoosterService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
+  final FinancialService _financialService = FinancialService(); // ✅ AGREGADO
 
   String? get currentUserId => _auth.currentUser?.uid;
   String? get currentUserEmail => _auth.currentUser?.email;
@@ -134,7 +136,7 @@ class RoosterService {
     }
   }
 
-  Future<void> addNewRooster({
+  Future<RoosterModel> addNewRooster({
     required String galleraId,
     required String name,
     required String plate,
@@ -157,6 +159,7 @@ class RoosterService {
     double? weight,
     String? areaId,
     String? areaName,
+    List<File>? additionalImages, // <-- NUEVO PARÁMETRO
   }) async {
     if (currentUserId == null) throw Exception("Usuario no autenticado.");
     
@@ -173,6 +176,12 @@ class RoosterService {
       UploadTask uploadTask = photoRef.putFile(compressedImage); // ✅ Usar imagen comprimida
       TaskSnapshot snapshot = await uploadTask;
       String downloadUrl = await snapshot.ref.getDownloadURL();
+
+      // ✅ Subir fotos adicionales si existen
+      List<String> additionalPhotoUrls = [];
+      if (additionalImages != null && additionalImages.isNotEmpty) {
+        additionalPhotoUrls = await _uploadAdditionalPhotos(additionalImages);
+      }
 
       Map<String, dynamic> roosterData = {
         'name': name,
@@ -201,8 +210,40 @@ class RoosterService {
         'weight': weight,
         'areaId': areaId,
         'areaName': areaName,
+        'additionalPhotos': additionalPhotoUrls, // <-- GUARDAR URLs
       };
-      await _roostersCollection(galleraId).add(roosterData);
+
+      DocumentReference ref =
+          await _roostersCollection(galleraId).add(roosterData);
+
+      return RoosterModel(
+        id: ref.id,
+        name: name,
+        plate: plate,
+        status: status,
+        birthDate: Timestamp.fromDate(birthDate),
+        sex: sex,
+        imageUrl: downloadUrl,
+        fatherId: fatherId,
+        fatherName: fatherName,
+        motherId: motherId,
+        motherName: motherName,
+        fatherLineageText: fatherLineageText,
+        motherLineageText: motherLineageText,
+        breedLine: breedLine,
+        color: color,
+        combType: combType,
+        legColor: legColor,
+        salePrice: salePrice,
+        saleDate: null,
+        buyerName: null,
+        saleNotes: null,
+        showInShowcase: showInShowcase ?? false,
+        weight: weight,
+        areaId: areaId,
+        areaName: areaName,
+        additionalPhotos: additionalPhotoUrls, // <-- AGREGADO
+      );
     } catch (e) {
       try {
         await photoRef.delete();
@@ -213,7 +254,25 @@ class RoosterService {
     }
   }
 
-  Future<void> updateRooster({
+  // ✅ HELPER PARA SUBIOR MÚLTIPLES FOTOS CON COMPRESIÓN
+  Future<List<String>> _uploadAdditionalPhotos(List<File> images) async {
+    List<String> urls = [];
+    for (var image in images) {
+      final compressed = await _compressImage(image);
+      if (compressed == null) continue;
+
+      String path =
+          'users/$currentUserId/gallos/extras/${DateTime.now().millisecondsSinceEpoch}_${images.indexOf(image)}.jpg';
+      Reference ref = _storage.ref().child(path);
+      UploadTask task = ref.putFile(compressed);
+      TaskSnapshot snap = await task;
+      String url = await snap.ref.getDownloadURL();
+      urls.add(url);
+    }
+    return urls;
+  }
+
+  Future<RoosterModel> updateRooster({
     required String galleraId,
     required String roosterId,
     required String name,
@@ -241,6 +300,8 @@ class RoosterService {
     double? weight,
     String? areaId,
     String? areaName,
+    List<File>? newAdditionalImages, // <-- NUEVO PARÁMETRO
+    List<String>? existingAdditionalPhotos, // <-- NUEVO PARÁMETRO
   }) async {
     if (currentUserId == null) throw Exception("Usuario no autenticado.");
     String imageUrl = existingImageUrl ?? '';
@@ -260,36 +321,51 @@ class RoosterService {
         TaskSnapshot snapshot = await uploadTask;
         imageUrl = await snapshot.ref.getDownloadURL();
       }
-      Map<String, dynamic> updatedData = {
-        'name': name,
-        'plate': plate,
-        'status': status,
-        'birthDate': Timestamp.fromDate(birthDate),
-        'imageUrl': imageUrl,
-        'sex': sex,
-        'lastUpdate': FieldValue.serverTimestamp(),
-        'fatherId': fatherId,
-        'fatherName': fatherName,
-        'motherId': motherId,
-        'motherName': motherName,
-        'fatherLineageText': fatherLineageText,
-        'motherLineageText': motherLineageText,
-        'breedLine': breedLine,
-        'color': color,
-        'combType': combType,
-        'legColor': legColor,
-        'salePrice': salePrice,
-        'saleDate': saleDate != null ? Timestamp.fromDate(saleDate) : null,
-        'buyerName': buyerName,
-        'saleNotes': saleNotes,
-        'showInShowcase': showInShowcase,
-        'weight': weight,
-        'areaId': areaId,
-        'areaName': areaName,
-      };
+
+      // ✅ Manejar fotos adicionales
+      List<String> finalAdditionalPhotos =
+          List<String>.from(existingAdditionalPhotos ?? []);
+
+      if (newAdditionalImages != null && newAdditionalImages.isNotEmpty) {
+        final newUrls = await _uploadAdditionalPhotos(newAdditionalImages);
+        finalAdditionalPhotos.addAll(newUrls);
+      }
+
+      final updatedRooster = RoosterModel(
+        id: roosterId,
+        name: name,
+        plate: plate,
+        status: status,
+        birthDate: Timestamp.fromDate(birthDate),
+        sex: sex,
+        imageUrl: imageUrl,
+        fatherId: fatherId,
+        fatherName: fatherName,
+        motherId: motherId,
+        motherName: motherName,
+        fatherLineageText: fatherLineageText,
+        motherLineageText: motherLineageText,
+        breedLine: breedLine,
+        color: color,
+        combType: combType,
+        legColor: legColor,
+        salePrice: salePrice,
+        saleDate: saleDate != null ? Timestamp.fromDate(saleDate) : null,
+        buyerName: buyerName,
+        saleNotes: saleNotes,
+        showInShowcase: showInShowcase ?? false,
+        weight: weight,
+        areaId: areaId,
+        areaName: areaName,
+        additionalPhotos: finalAdditionalPhotos, // <-- AGREGADO
+      );
+
+      final updatedData = updatedRooster.toMap();
+      updatedData['lastUpdate'] = FieldValue.serverTimestamp();
 
       await _roostersCollection(galleraId).doc(roosterId).update(updatedData);
 
+      // Limpiar la imagen antigua de Storage si se subió una nueva
       if (newImageFile != null &&
           existingImageUrl != null &&
           existingImageUrl.isNotEmpty) {
@@ -301,6 +377,8 @@ class RoosterService {
           print("No se pudo borrar imagen antigua: $e");
         }
       }
+
+      return updatedRooster;
     } catch (e) {
       if (newPhotoRef != null) {
         await newPhotoRef.delete();
@@ -336,6 +414,17 @@ class RoosterService {
     };
 
     await _roostersCollection(galleraId).doc(roosterId).update(saleData);
+
+    // ✅ REGISTRO AUTOMÁTICO EN FINANZAS
+    await _financialService.addTransaction(
+      galleraId: galleraId,
+      type: 'ingreso',
+      category: 'venta',
+      amount: salePrice,
+      description: 'Venta de ejemplar (ID: $roosterId) a $buyerName',
+      date: saleDate,
+      relatedId: roosterId,
+    );
   }
 
   Future<void> deleteRooster({
@@ -379,5 +468,44 @@ class RoosterService {
         .map((snapshot) => snapshot.docs
             .map((doc) => RoosterModel.fromFirestore(doc))
             .toList());
+  }
+
+  /// --- ¡NUEVA FUNCIÓN! ---
+  /// Registra un nuevo pesaje en el historial del gallo y actualiza su peso actual.
+  Future<void> addWeightRecord({
+    required String galleraId,
+    required String roosterId,
+    required double newWeight,
+    DateTime? date,
+    String? notes,
+  }) async {
+    final recordDate = date ?? DateTime.now();
+    final Map<String, dynamic> newRecord = {
+      'date': Timestamp.fromDate(recordDate),
+      'weight': newWeight,
+      'notes': notes ?? '',
+    };
+
+    // Actualizamos tanto el peso actual como el historial en una sola operación
+    await _roostersCollection(galleraId).doc(roosterId).update({
+      'weight': newWeight,
+      'weightHistory': FieldValue.arrayUnion([newRecord]),
+      'lastUpdate': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// --- ¡NUEVA FUNCIÓN! ---
+  /// Actualiza el área asignada a un gallo.
+  Future<void> updateRoosterArea({
+    required String galleraId,
+    required String roosterId,
+    required String? areaId,
+    required String? areaName,
+  }) async {
+    await _roostersCollection(galleraId).doc(roosterId).update({
+      'areaId': areaId,
+      'areaName': areaName,
+      'lastUpdate': FieldValue.serverTimestamp(),
+    });
   }
 }

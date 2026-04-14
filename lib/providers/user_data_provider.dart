@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:roozterfaceapp/models/user_model.dart';
+import 'package:roozterfaceapp/services/notification_service.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';
 import 'package:roozterfaceapp/services/user_service.dart';
 
@@ -36,6 +37,8 @@ class UserDataProvider with ChangeNotifier {
       await _profileSubscription?.cancel();
       _profileSubscription =
           _roosterService.getUserProfileStream().listen(_onProfileUpdated);
+      // Inicializar notificaciones cuando el usuario ya está autenticado
+      await NotificationService().initialize();
     }
     // Si el usuario cierra sesión, limpiamos todo.
     else {

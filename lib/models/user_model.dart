@@ -16,6 +16,7 @@ class UserModel {
   final String country;
   final String plan;
   final String? activeGalleraId;
+  final String? activePartidoId; // ✅ NUEVO: Referencia al partido actual
 
   // --- ¡NUEVO CAMPO! ---
   // Lista de IDs de las galleras a las que pertenece o es miembro
@@ -35,6 +36,7 @@ class UserModel {
     required this.country,
     this.plan = 'iniciacion',
     this.activeGalleraId,
+    this.activePartidoId,
     this.galleraIds = const [], // Valor por defecto: lista vacía
   });
 
@@ -57,6 +59,7 @@ class UserModel {
       country: data['country'] ?? '',
       plan: data['plan'] ?? 'iniciacion',
       activeGalleraId: data['activeGalleraId'],
+      activePartidoId: data['activePartidoId'],
       galleraIds: galleras,
     );
   }
@@ -76,6 +79,7 @@ class UserModel {
       'country': country,
       'plan': plan,
       'activeGalleraId': activeGalleraId,
+      'activePartidoId': activePartidoId,
       'galleraIds': galleraIds,
     };
   }

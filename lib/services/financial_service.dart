@@ -186,4 +186,33 @@ class FinancialService {
 
     return breakdown;
   }
+
+  /// Registra una nueva transacción (ingreso o gasto) en la gallera.
+  Future<void> addTransaction({
+    required String galleraId,
+    required String type, // 'ingreso' o 'gasto'
+    required String category,
+    required double amount,
+    required String description,
+    required DateTime date,
+    String? relatedId, // ID del gallo, combate, etc.
+  }) async {
+    if (galleraId.isEmpty) return;
+
+    final transactionData = {
+      'type': type,
+      'category': category,
+      'amount': amount,
+      'description': description,
+      'date': Timestamp.fromDate(date),
+      'relatedId': relatedId,
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+
+    await _firestore
+        .collection('galleras')
+        .doc(galleraId)
+        .collection('transactions')
+        .add(transactionData);
+  }
 }

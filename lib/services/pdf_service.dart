@@ -8,6 +8,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:roozterfaceapp/models/rooster_model.dart';
 import 'package:roozterfaceapp/screens/pedigree_screen.dart';
+import 'package:roozterfaceapp/services/financial_service.dart'; // ✅ NUEVO
+import 'package:intl/intl.dart';
 
 class PdfService {
   Future<void> generateAndOpenPedigreePdf(PedigreeNode rootNode) async {
@@ -60,6 +62,250 @@ class PdfService {
     await file.writeAsBytes(await pdf.save());
 
     await OpenFilex.open(file.path);
+  }
+
+  Future<void> generateInventoryPdf({
+    required List<RoosterModel> roosters,
+    required String galleraName,
+  }) async {
+    final pdf = pw.Document();
+    final now = DateTime.now();
+    final formatter = DateFormat('dd/MM/yyyy HH:mm');
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => _buildInventoryHeader(galleraName, formatter.format(now)),
+        footer: (context) => _buildInventoryFooter(context),
+        build: (context) => [
+          _buildInventorySummary(roosters),
+          pw.SizedBox(height: 20),
+          _buildInventoryTable(roosters),
+        ],
+      ),
+    );
+
+    final output = await getTemporaryDirectory();
+    final file = File("${output.path}/inventario_${now.millisecondsSinceEpoch}.pdf");
+    await file.writeAsBytes(await pdf.save());
+
+    await OpenFilex.open(file.path);
+  }
+
+  pw.Widget _buildInventoryHeader(String galleraName, String date) {
+    return pw.Column(
+      children: [
+        pw.Row(
+          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          children: [
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  "Reporte de Inventario",
+                  style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+                ),
+                pw.Text(
+                  galleraName,
+                  style: const pw.TextStyle(fontSize: 18),
+                ),
+              ],
+            ),
+            pw.Text(date),
+          ],
+        ),
+        pw.SizedBox(height: 10),
+        pw.Divider(thickness: 2),
+        pw.SizedBox(height: 20),
+      ],
+    );
+  }
+
+  pw.Widget _buildInventoryFooter(pw.Context context) {
+    return pw.Container(
+      alignment: pw.Alignment.centerRight,
+      margin: const pw.EdgeInsets.only(top: 10),
+      child: pw.Text(
+        'Página ${context.pageNumber} de ${context.pagesCount}',
+        style: const pw.TextStyle(fontSize: 10),
+      ),
+    );
+  }
+
+  pw.Widget _buildInventorySummary(List<RoosterModel> roosters) {
+    final total = roosters.length;
+    final males = roosters.where((r) => r.sex == 'macho').length;
+    final females = roosters.where((r) => r.sex == 'hembra').length;
+
+    return pw.Container(
+      padding: const pw.EdgeInsets.all(10),
+      decoration: pw.BoxDecoration(
+        border: pw.Border.all(color: PdfColors.grey300),
+        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(8)),
+      ),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceAround,
+        children: [
+          _buildStatItem("Total", total.toString()),
+          _buildStatItem("Machos", males.toString()),
+          _buildStatItem("Hembras", females.toString()),
+        ],
+      ),
+    );
+  }
+
+  pw.Widget _buildStatItem(String label, String value) {
+    return pw.Column(
+      children: [
+        pw.Text(label, style: const pw.TextStyle(fontSize: 10)),
+        pw.Text(value, style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold)),
+      ],
+    );
+  }
+
+  pw.Widget _buildInventoryTable(List<RoosterModel> roosters) {
+    final headers = ['Placa', 'Nombre', 'Sexo', 'Línea', 'Estado', 'Peso'];
+
+    final data = roosters.map((r) {
+      return [
+        r.plate.isNotEmpty ? r.plate : '-',
+        r.name,
+        r.sex == 'macho' ? 'M' : 'H',
+        r.breedLine ?? '-',
+        r.status,
+        r.weight != null ? "${r.weight!.toStringAsFixed(2)}kg" : '-',
+      ];
+    }).toList();
+
+    return pw.TableHelper.fromTextArray(
+      headers: headers,
+      data: data,
+      border: null,
+      headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+      headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey700),
+      cellHeight: 30,
+      cellAlignments: {
+        0: pw.Alignment.centerLeft,
+        1: pw.Alignment.centerLeft,
+        2: pw.Alignment.center,
+                        3: pw.Alignment.centerLeft,
+                        4: pw.Alignment.centerLeft,
+                        5: pw.Alignment.centerRight,
+                      },
+    );
+  }
+
+  Future<void> generateRoosterDetailPdf({
+    required RoosterModel rooster,
+    required String galleraName,
+  }) async {
+    final pdf = pw.Document();
+    final now = DateTime.now();
+    final formatter = DateFormat('dd/MM/yyyy');
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        build: (context) {
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              _buildInventoryHeader(galleraName, formatter.format(now)),
+              pw.Center(
+                child: pw.Text(
+                  rooster.name,
+                  style: pw.TextStyle(fontSize: 28, fontWeight: pw.FontWeight.bold),
+                ),
+              ),
+              pw.SizedBox(height: 10),
+              pw.Divider(),
+              pw.SizedBox(height: 20),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    flex: 2,
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        _buildInfoLine("Placa:", rooster.plate),
+                        _buildInfoLine("Sexo:", rooster.sex),
+                        _buildInfoLine("Nacimiento:", rooster.birthDate != null ? formatter.format(rooster.birthDate.toDate()) : 'N/A'),
+                        _buildInfoLine("Estado:", rooster.status),
+                        _buildInfoLine("Peso:", rooster.weight != null ? "${rooster.weight!.toStringAsFixed(2)}kg" : 'N/A'),
+                        _buildInfoLine("Ubicación:", rooster.areaName ?? 'N/A'),
+                        pw.SizedBox(height: 20),
+                        pw.Text("Características", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+                        _buildInfoLine("Línea:", rooster.breedLine ?? 'N/A'),
+                        _buildInfoLine("Color:", rooster.color ?? 'N/A'),
+                        _buildInfoLine("Cresta:", rooster.combType ?? 'N/A'),
+                        _buildInfoLine("Patas:", rooster.legColor ?? 'N/A'),
+                        pw.SizedBox(height: 20),
+                        pw.Text("Linaje", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16)),
+                        _buildInfoLine("Padre:", rooster.fatherName ?? rooster.fatherLineageText ?? 'N/A'),
+                        _buildInfoLine("Madre:", rooster.motherName ?? rooster.motherLineageText ?? 'N/A'),
+                      ],
+                    ),
+                  ),
+                  pw.Expanded(
+                    flex: 1,
+                    child: pw.Container(
+                      padding: const pw.EdgeInsets.all(10),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.grey400),
+                        borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+                      ),
+                      child: pw.Column(
+                        children: [
+                          pw.Text("RoozterFace", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.blueGrey)),
+                          pw.SizedBox(height: 10),
+                          pw.Text("FICHA TÉCNICA", style: const pw.TextStyle(fontSize: 10)),
+                          pw.Divider(),
+                          pw.SizedBox(height: 10),
+                          pw.Text("Escanee para ver en la App", style: const pw.TextStyle(fontSize: 8), textAlign: pw.TextAlign.center),
+                          // Aquí iría un QR si tuviéramos la librería, pero por ahora un placeholder elegante
+                          pw.Container(
+                            height: 60,
+                            width: 60,
+                            color: PdfColors.grey200,
+                            child: pw.Center(child: pw.Text("RF", style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              pw.Spacer(),
+              pw.Divider(),
+              pw.Align(
+                alignment: pw.Alignment.centerRight,
+                child: pw.Text("Generado por RoozterFace - La mejor gestión para tu gallera", style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey)),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final output = await getTemporaryDirectory();
+    final file = File("${output.path}/ficha_${rooster.name.replaceAll(' ', '_')}.pdf");
+    await file.writeAsBytes(await pdf.save());
+
+    await OpenFilex.open(file.path);
+  }
+
+  pw.Widget _buildInfoLine(String label, String value) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 2),
+      child: pw.Row(
+        children: [
+          pw.Text("$label ", style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 12)),
+          pw.Text(value, style: const pw.TextStyle(fontSize: 12)),
+        ],
+      ),
+    );
   }
 
   // Esta lógica de layout con Row/Column anidados es la correcta.
@@ -158,6 +404,102 @@ class PdfService {
             pw.Text(rooster.plate,
                 style:
                     const pw.TextStyle(fontSize: 10, color: PdfColors.grey600)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> generateFinancialReportPdf({
+    required FinancialSummary summary,
+    required List<Map<String, dynamic>> monthlyData,
+    required Map<String, double> categoryBreakdown,
+    required String galleraName,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final pdf = pw.Document();
+    final formatter = DateFormat('dd/MM/yyyy');
+
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(32),
+        header: (context) => _buildInventoryHeader(galleraName, "Reporte Financiero"),
+        footer: (context) => _buildInventoryFooter(context),
+        build: (context) => [
+          pw.Text("Periodo: ${formatter.format(startDate)} al ${formatter.format(endDate)}",
+              style: pw.TextStyle(color: PdfColors.grey700, fontSize: 12)),
+          pw.SizedBox(height: 20),
+          
+          pw.Text("Resumen General", style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 10),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(15),
+            decoration: pw.BoxDecoration(
+              color: PdfColors.grey100,
+              borderRadius: const pw.BorderRadius.all(pw.Radius.circular(10)),
+            ),
+            child: pw.Column(
+              children: [
+                _buildFinanceRow("Ingresos Totales", summary.totalIncome, PdfColors.green),
+                _buildFinanceRow("Gastos Totales", summary.totalExpenses, PdfColors.red),
+                pw.Divider(),
+                _buildFinanceRow("Balance Neto", summary.netBalance, 
+                    summary.netBalance >= 0 ? PdfColors.blue700 : PdfColors.red700, isBold: true),
+              ],
+            ),
+          ),
+          pw.SizedBox(height: 30),
+
+          pw.Text("Distribución de Gastos", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+          pw.SizedBox(height: 10),
+          if (categoryBreakdown.isEmpty)
+            pw.Text("No hay gastos registrados en este periodo.")
+          else
+            pw.TableHelper.fromTextArray(
+              headers: ['Categoría', 'Monto'],
+              data: categoryBreakdown.entries.map((e) => [
+                e.key,
+                NumberFormat.currency(locale: 'es_MX', symbol: '\$').format(e.value)
+              ]).toList(),
+              border: null,
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.white),
+              headerDecoration: const pw.BoxDecoration(color: PdfColors.blueGrey),
+              cellAlignments: {
+                0: pw.Alignment.centerLeft,
+                1: pw.Alignment.centerRight,
+              },
+            ),
+
+          pw.SizedBox(height: 30),
+          pw.Text("Este reporte administrativo es generado por RoozterFace para fines de auditoría.", 
+                 style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+        ],
+      ),
+    );
+
+    final output = await getTemporaryDirectory();
+    final file = File("${output.path}/reporte_financiero_${DateTime.now().millisecondsSinceEpoch}.pdf");
+    await file.writeAsBytes(await pdf.save());
+
+    await OpenFilex.open(file.path);
+  }
+
+  pw.Widget _buildFinanceRow(String label, double amount, PdfColor color, {bool isBold = false}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.Text(label, style: pw.TextStyle(fontWeight: isBold ? pw.FontWeight.bold : pw.FontWeight.normal)),
+          pw.Text(
+            NumberFormat.currency(locale: 'es_MX', symbol: '\$').format(amount),
+            style: pw.TextStyle(
+              color: color,
+              fontWeight: pw.FontWeight.bold,
+              fontSize: isBold ? 14 : 12,
+            ),
+          ),
         ],
       ),
     );

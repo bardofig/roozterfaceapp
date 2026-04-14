@@ -15,12 +15,15 @@ class FightModel {
   final String? preparationNotes;
   final String? postFightNotes;
 
-  final String? weaponType;
-  final String? fightDuration;
-  final String? injuriesSustained;
-
-  // --- ¡NUEVO CAMPO FINANCIERO! ---
   final double? netProfit; // Ganancia o pérdida neta del evento
+  final String? partidoId; // ✅ NUEVO: ID del partido
+  final String? tournamentId; // ✅ NUEVO: ID del torneo
+  final int? fightTimeSeconds; // ✅ NUEVO: Duración para Tiempo de Fondo
+  final String? weaponType; // Ej: Navaja de pulgada, Espuela
+  final String? weaponLength; // Ej: 1", 1 1/4"
+  final String? weaponMaterial; // Ej: Acero al carbono
+  final String? injuriesSustained;
+  final String? fightDuration; // ✅ RESTAURADO: Campo legado/texto libre
 
   FightModel({
     required this.id,
@@ -32,10 +35,15 @@ class FightModel {
     this.survived,
     this.preparationNotes,
     this.postFightNotes,
+    this.netProfit,
+    this.partidoId,
+    this.tournamentId,
+    this.fightTimeSeconds,
     this.weaponType,
-    this.fightDuration,
+    this.weaponLength,
+    this.weaponMaterial,
     this.injuriesSustained,
-    this.netProfit, // <-- AÑADIDO AL CONSTRUCTOR
+    this.fightDuration,
   });
 
   factory FightModel.fromFirestore(DocumentSnapshot doc) {
@@ -50,11 +58,38 @@ class FightModel {
       survived: data['survived'],
       preparationNotes: data['preparationNotes'],
       postFightNotes: data['postFightNotes'],
-      weaponType: data['weaponType'],
+      netProfit: (data['netProfit'] ?? 0.0).toDouble(),
+      partidoId: data['partidoId'],
+      tournamentId: data['tournamentId'],
+      fightTimeSeconds: data['fightTimeSeconds'],
+      weaponType: data['weaponType'] ?? data['weapon_type'],
+      weaponLength: data['weaponLength'],
+      weaponMaterial: data['weaponMaterial'],
+      injuriesSustained: data['injuriesSustained'] ?? data['injuries_sustained'],
       fightDuration: data['fightDuration'],
-      injuriesSustained: data['injuriesSustained'],
-      // Leemos el nuevo campo
-      netProfit: (data['netProfit'] as num?)?.toDouble(),
     );
+  }
+
+  /// Convierte el modelo a un mapa para escritura en Firestore.
+  Map<String, dynamic> toMap() {
+    return {
+      'date': Timestamp.fromDate(date),
+      'location': location,
+      'status': status,
+      'opponent': opponent,
+      'result': result,
+      'survived': survived,
+      'preparationNotes': preparationNotes,
+      'postFightNotes': postFightNotes,
+      'netProfit': netProfit,
+      'partidoId': partidoId,
+      'tournamentId': tournamentId,
+      'fightTimeSeconds': fightTimeSeconds,
+      'weaponType': weaponType,
+      'weaponLength': weaponLength,
+      'weaponMaterial': weaponMaterial,
+      'injuriesSustained': injuriesSustained,
+      'fightDuration': fightDuration,
+    };
   }
 }

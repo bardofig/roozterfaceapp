@@ -76,29 +76,28 @@ class BreedingService {
             .toList());
   }
 
-  Stream<List<BreedingEventModel>> getBreedingHistoryStream({
+  Future<List<BreedingEventModel>> getBreedingHistory({
     required String galleraId,
     required String roosterId,
-  }) {
-    if (galleraId.isEmpty) return Stream.value([]);
+  }) async {
+    if (galleraId.isEmpty) return [];
 
-    var fatherQuery = _breedingEventsCollection(galleraId)
+    final fatherQuery = _breedingEventsCollection(galleraId)
         .where('fatherId', isEqualTo: roosterId);
-    var motherQuery = _breedingEventsCollection(galleraId)
+    final motherQuery = _breedingEventsCollection(galleraId)
         .where('motherId', isEqualTo: roosterId);
 
-    return Stream.fromFuture(
-            Future.wait([fatherQuery.get(), motherQuery.get()]))
-        .asyncMap((snapshots) {
-      final combinedDocs = [...snapshots[0].docs, ...snapshots[1].docs];
-      final uniqueDocs =
-          {for (var doc in combinedDocs) doc.id: doc}.values.toList();
-      final events = uniqueDocs
-          .map((doc) => BreedingEventModel.fromFirestore(doc))
-          .toList();
-      events.sort((a, b) => b.eventDate.compareTo(a.eventDate));
-      return events;
-    });
+    final results = await Future.wait([fatherQuery.get(), motherQuery.get()]);
+    
+    final combinedDocs = [...results[0].docs, ...results[1].docs];
+    final uniqueDocs = {for (var doc in combinedDocs) doc.id: doc}.values.toList();
+    
+    final events = uniqueDocs
+        .map((doc) => BreedingEventModel.fromFirestore(doc))
+        .toList();
+    
+    events.sort((a, b) => b.eventDate.compareTo(a.eventDate));
+    return events;
   }
 
   Future<void> addBreedingEvent({

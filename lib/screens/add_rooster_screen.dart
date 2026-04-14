@@ -10,6 +10,8 @@ import 'package:roozterfaceapp/models/area_model.dart';
 import 'package:roozterfaceapp/models/rooster_model.dart';
 import 'package:roozterfaceapp/services/area_service.dart';
 import 'package:roozterfaceapp/services/rooster_service.dart';
+import 'package:provider/provider.dart';
+import 'package:roozterfaceapp/providers/rooster_list_provider.dart';
 
 enum Sex { macho, hembra }
 
@@ -52,6 +54,8 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
   String? _selectedStatus;
   late List<String> _statuses;
   File? _selectedImage;
+  List<File> _additionalImages = []; // <-- NUEVAS FOTOS LOCALES
+  List<String> _existingAdditionalPhotos = []; // <-- FOTOS REMOTAS EXISTENTES
   bool _isSaving = false;
   String? _selectedFatherId;
   String? _selectedMotherId;
@@ -138,6 +142,10 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
         });
       }
     });
+
+    // Cargar fotos adicionales existentes
+    _existingAdditionalPhotos = List<String>.from(rooster.additionalPhotos ?? []);
+    
     _updateBreedProfile();
   }
 
@@ -234,6 +242,16 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
     }
   }
 
+  Future<void> _pickAdditionalImages() async {
+    final picker = ImagePicker();
+    final pickedFiles = await picker.pickMultiImage(imageQuality: 70);
+    if (pickedFiles.isNotEmpty) {
+      setState(() {
+        _additionalImages.addAll(pickedFiles.map((f) => File(f.path)));
+      });
+    }
+  }
+
   Future<void> _saveRooster(List<RoosterModel> allRoosters) async {
     if (!_formKey.currentState!.validate() || _selectedDate == null) {
       if (_selectedDate == null) {
@@ -285,7 +303,7 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
 
     try {
       if (widget.roosterToEdit != null) {
-        await _roosterService.updateRooster(
+        final updatedRooster = await _roosterService.updateRooster(
           galleraId: widget.activeGalleraId,
           roosterId: widget.roosterToEdit!.id,
           name: _nameController.text,
@@ -313,9 +331,15 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
           weight: weight,
           areaId: _selectedArea?.id,
           areaName: _selectedArea?.name,
+          newAdditionalImages: _additionalImages,
+          existingAdditionalPhotos: _existingAdditionalPhotos,
         );
+        if (mounted) {
+          Provider.of<RoosterListProvider>(context, listen: false)
+              .updateRoosterLocally(updatedRooster);
+        }
       } else {
-        await _roosterService.addNewRooster(
+        final newRooster = await _roosterService.addNewRooster(
           galleraId: widget.activeGalleraId,
           name: _nameController.text,
           plate: _plateController.text,
@@ -338,7 +362,12 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
           weight: weight,
           areaId: _selectedArea?.id,
           areaName: _selectedArea?.name,
+          additionalImages: _additionalImages,
         );
+        if (mounted) {
+          Provider.of<RoosterListProvider>(context, listen: false)
+              .addRoosterLocally(newRooster);
+        }
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -468,7 +497,10 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
                                 color: Colors.white, size: 20)),
                         onPressed: _pickImage),
                   ])),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+                  // --- GALERÍA ADICIONAL ---
+                  _buildAdditionalGallery(),
+                  const SizedBox(height: 16),
                   Center(
                     child: SegmentedButton<Sex>(
                       segments: const <ButtonSegment<Sex>>[
@@ -799,5 +831,90 @@ class _AddRoosterScreenState extends State<AddRoosterScreen> {
         ],
       ))),
     ]);
+  }
+
+  Widget _buildAdditionalGallery() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text("Galería Adicional",
+                style: Theme.of(context).textTheme.titleMedium),
+            TextButton.icon(
+              onPressed: _pickAdditionalImages,
+              icon: const Icon(Icons.add_a_photo, size: 20),
+              label: const Text("Añadir"),
+            ),
+          ],
+        ),
+        if (_existingAdditionalPhotos.isEmpty && _additionalImages.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text("No hay fotos adicionales",
+                style: TextStyle(color: Colors.grey, fontSize: 13)),
+          )
+        else
+          SizedBox(
+            height: 100,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                // FOTOS REMOTAS
+                ..._existingAdditionalPhotos.map((url) => _buildGalleryItem(
+                      child: Image.network(url,
+                          fit: BoxFit.cover, width: 90, height: 90),
+                      onDelete: () {
+                        setState(() {
+                          _existingAdditionalPhotos.remove(url);
+                        });
+                      },
+                    )),
+                // FOTOS LOCALES
+                ..._additionalImages.map((file) => _buildGalleryItem(
+                      child: Image.file(file,
+                          fit: BoxFit.cover, width: 90, height: 90),
+                      onDelete: () {
+                        setState(() {
+                          _additionalImages.remove(file);
+                        });
+                      },
+                    )),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildGalleryItem({required Widget child, required VoidCallback onDelete}) {
+    return Stack(
+      children: [
+        Container(
+          margin: const EdgeInsets.only(right: 12, top: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: child,
+          ),
+        ),
+        Positioned(
+          top: 0,
+          right: 4,
+          child: GestureDetector(
+            onTap: onDelete,
+            child: const CircleAvatar(
+              radius: 12,
+              backgroundColor: Colors.red,
+              child: Icon(Icons.close, color: Colors.white, size: 14),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }

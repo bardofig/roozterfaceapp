@@ -7,6 +7,8 @@ const triggers = require("./src/triggers");
 exports.onRoosterUpdate = triggers.onRoosterUpdate;
 exports.onUserUpdate = triggers.onUserUpdate;
 exports.onGalleraUpdate = triggers.onGalleraUpdate;
+exports.onTransactionCreated = triggers.onTransactionCreated;
+exports.onFightResult = triggers.onFightResult;
 
 // Export gallera management
 const galleras = require("./src/galleras");

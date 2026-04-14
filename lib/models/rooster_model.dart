@@ -38,6 +38,8 @@ class RoosterModel {
   final double? weight;
   final String? areaId;
   final String? areaName;
+  final List<String>? additionalPhotos;
+  final List<Map<String, dynamic>>? weightHistory; // --- NUEVO CAMPO PARA HISTORIAL ---
 
   RoosterModel({
     required this.id,
@@ -65,6 +67,8 @@ class RoosterModel {
     this.weight,
     this.areaId,
     this.areaName,
+    this.additionalPhotos,
+    this.weightHistory, // <-- AÑADIDO AL CONSTRUCTOR
   });
 
   factory RoosterModel.fromFirestore(DocumentSnapshot doc) {
@@ -97,6 +101,44 @@ class RoosterModel {
       weight: (data['weight'] as num?)?.toDouble(),
       areaId: data['areaId'],
       areaName: data['areaName'],
+      additionalPhotos: data['additionalPhotos'] != null
+          ? List<String>.from(data['additionalPhotos'])
+          : [],
+      weightHistory: data['weightHistory'] != null
+          ? List<Map<String, dynamic>>.from(data['weightHistory'])
+          : [], // <-- DESERIALIZACIÓN DE HISTORIAL
     );
+  }
+
+  /// Convierte el modelo a un mapa para escritura en Firestore.
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'plate': plate,
+      'status': status,
+      'birthDate': birthDate,
+      'imageUrl': imageUrl,
+      'sex': sex,
+      'fatherId': fatherId,
+      'fatherName': fatherName,
+      'motherId': motherId,
+      'motherName': motherName,
+      'fatherLineageText': fatherLineageText,
+      'motherLineageText': motherLineageText,
+      'breedLine': breedLine,
+      'color': color,
+      'combType': combType,
+      'legColor': legColor,
+      'salePrice': salePrice,
+      'saleDate': saleDate,
+      'buyerName': buyerName,
+      'saleNotes': saleNotes,
+      'showInShowcase': showInShowcase ?? false,
+      'weight': weight,
+      'areaId': areaId,
+      'areaName': areaName,
+      'additionalPhotos': additionalPhotos ?? [],
+      'weightHistory': weightHistory ?? [], // <-- SERIALIZACIÓN DE HISTORIAL
+    };
   }
 }

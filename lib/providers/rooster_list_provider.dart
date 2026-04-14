@@ -128,6 +128,21 @@ class RoosterListProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  /// Actualiza un gallo en la lista localmente
+  void updateRoosterLocally(RoosterModel updatedRooster) {
+    final index = _roosters.indexWhere((r) => r.id == updatedRooster.id);
+    if (index != -1) {
+      _roosters[index] = updatedRooster;
+      notifyListeners();
+    }
+  }
+
+  /// Elimina un gallo de la lista localmente
+  void removeRoosterLocally(String roosterId) {
+    _roosters.removeWhere((r) => r.id == roosterId);
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _isDisposed = true;

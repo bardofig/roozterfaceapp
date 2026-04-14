@@ -46,7 +46,7 @@ class RoosterTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 16.0),
+        margin: const EdgeInsets.symmetric(vertical: 1.5, horizontal: 16.0),
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(12),

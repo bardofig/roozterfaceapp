@@ -36,32 +36,32 @@ class FightService {
       return snapshot.docs.map((doc) => FightModel.fromFirestore(doc)).toList();
     });
   }
-
   Future<void> addFight({
     required String galleraId,
     required String roosterId,
     required DateTime date,
     required String location,
     String? preparationNotes,
+    String? partidoId, // ✅ NUEVO
   }) async {
     try {
-      Map<String, dynamic> fightData = {
-        'galleraId': galleraId,
-        'roosterId': roosterId,
-        'date': Timestamp.fromDate(date),
-        'location': location,
-        'preparationNotes': preparationNotes,
-        'status': 'Programado',
-        'opponent': null,
-        'result': null,
-        'postFightNotes': null,
-        'survived': null,
-        'weaponType': null,
-        'fightDuration': null,
-        'injuriesSustained': null,
-        'netProfit': null,
-      };
-      await _fightsCollection(galleraId, roosterId).add(fightData);
+      final fight = FightModel(
+        id: '',
+        date: date,
+        location: location,
+        preparationNotes: preparationNotes,
+        status: 'Programado',
+        opponent: null,
+        result: null,
+        postFightNotes: null,
+        survived: true,
+        weaponType: null,
+        fightDuration: null,
+        injuriesSustained: null,
+        netProfit: null,
+        partidoId: partidoId, // ✅ NUEVO
+      );
+      await _fightsCollection(galleraId, roosterId).add(fight.toMap());
     } catch (e) {
       print("Error en FightService.addFight: $e");
       throw Exception("Ocurrió un error al programar el combate.");
@@ -99,22 +99,49 @@ class FightService {
             (roosterSnapshot.data() as Map<String, dynamic>)['status'] ??
                 'Activo';
 
-        Map<String, dynamic> fightData = {
-          'date': Timestamp.fromDate(date),
-          'location': location,
-          'preparationNotes': preparationNotes,
-          'status': 'Completado',
-          'opponent': opponent,
-          'result': result,
-          'postFightNotes': postFightNotes,
-          'survived': survived,
-          'weaponType': weaponType,
-          'fightDuration': fightDuration,
-          'injuriesSustained': injuriesSustained,
-          'netProfit': netProfit,
-        };
+        DocumentSnapshot fightSnapshot = await transaction.get(fightDocRef);
+        String? existingPartidoId;
+        if (fightSnapshot.exists) {
+          existingPartidoId = (fightSnapshot.data() as Map<String, dynamic>)['partidoId'];
+        }
 
-        transaction.update(fightDocRef, fightData);
+        final fight = FightModel(
+          id: fightId,
+          date: date,
+          location: location,
+          preparationNotes: preparationNotes,
+          status: 'Completado',
+          opponent: opponent,
+          result: result,
+          postFightNotes: postFightNotes,
+          survived: survived,
+          weaponType: weaponType,
+          fightDuration: fightDuration,
+          injuriesSustained: injuriesSustained,
+          netProfit: netProfit,
+          partidoId: existingPartidoId, // Mantenemos el partido original del combate
+        );
+
+        transaction.update(fightDocRef, fight.toMap());
+
+        // --- ¡NUEVA LÓGICA DE ESTADÍSTICAS DE PARTIDO! ---
+        if (fight.partidoId != null && fight.partidoId!.isNotEmpty) {
+          DocumentReference partidoRef = _firestore.collection('partidos').doc(fight.partidoId);
+          
+          // Incrementamos contadores atómicamente
+          int winInc = (result == 'Gana') ? 1 : 0;
+          int lossInc = (result == 'Pierde') ? 1 : 0;
+          int drawInc = (result == 'Empate' || result == 'Tablas') ? 1 : 0;
+          int deadInc = survived ? 0 : 1;
+
+          transaction.update(partidoRef, {
+            'totalFights': FieldValue.increment(1),
+            'wins': FieldValue.increment(winInc),
+            'losses': FieldValue.increment(lossInc),
+            'draws': FieldValue.increment(drawInc),
+            'lostRoosters': FieldValue.increment(deadInc),
+          });
+        }
 
         if (!survived) {
           transaction.update(roosterDocRef, {'status': 'Perdido en Combate'});
